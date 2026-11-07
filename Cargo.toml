@@ -1,0 +1,33 @@
+[package]
+name = "easydecoy"
+version = "0.1.0"
+edition = "2024"
+authors = ["Yariv Hakim"]
+description = "EasyDecoy - decoy network services that tell you when someone is inside your network"
+license = "MIT"
+repository = "https://github.com/easysysio/EasyDecoy"
+homepage = "https://github.com/easysysio/EasyDecoy"
+
+[[bin]]
+name = "easydecoy"
+path = "src/main.rs"
+
+[dependencies]
+# Async runtime. `signal` for a clean stop on Ctrl-C; `fs` and `io-std` for
+# writing events to a file or stdout.
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "io-util", "io-std", "sync", "time", "fs", "signal"] }
+
+# Tracing — EasyDecoy's own log, written to stderr so stdout carries only events
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Serialisation: TOML config in, JSON events out
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "0.8"
+
+# Error handling
+anyhow = "1"
+
+# Event timestamps
+chrono = { version = "0.4", features = ["serde"] }
