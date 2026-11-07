@@ -1,0 +1,16 @@
+# Rotates EasyDecoy's events file (installed as /etc/logrotate.d/easydecoy).
+#
+# copytruncate, because EasyDecoy keeps the file open in append mode: after
+# the copy, the truncated file is simply written from the start again, with no
+# signal or restart needed. su, because the directory belongs to the service
+# account rather than root.
+/var/log/easydecoy/events.jsonl {
+    su easydecoy easydecoy
+    weekly
+    rotate 12
+    compress
+    delaycompress
+    missingok
+    notifempty
+    copytruncate
+}

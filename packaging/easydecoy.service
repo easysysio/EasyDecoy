@@ -1,0 +1,55 @@
+# systemd service unit for EasyDecoy (installed by the deb/rpm packages).
+# Enable + start with:  sudo systemctl enable --now easydecoy
+[Unit]
+Description=EasyDecoy decoy network services
+Documentation=https://github.com/easysysio/EasyDecoy
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+Environment=EASYDECOY_CONFIG=/etc/easydecoy/easydecoy.toml
+ExecStart=/usr/bin/easydecoy
+Restart=on-failure
+RestartSec=2
+
+# An account of its own, never root. A decoy is the one service built to be
+# found by an intruder, and all it needs beyond an ordinary user is to bind the
+# real ports (23, 80). The package creates the account
+# (packaging/post-install.sh, run after every install and upgrade).
+User=easydecoy
+Group=easydecoy
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+NoNewPrivileges=yes
+
+# Creates /var/log/easydecoy, where events.jsonl is written, owned by the
+# account above. systemd makes it before the service starts.
+LogsDirectory=easydecoy
+UMask=0027
+
+# What it has no business touching. The whole filesystem is read-only to it
+# except the log directory; it gets no devices, no home directories, a /tmp of
+# its own, and only the system calls an ordinary network service makes.
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+RestrictNamespaces=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+
+[Install]
+WantedBy=multi-user.target

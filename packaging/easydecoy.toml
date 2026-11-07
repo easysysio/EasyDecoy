@@ -1,0 +1,32 @@
+# EasyDecoy configuration (system package default).
+#
+# Installed to /etc/easydecoy/easydecoy.toml on the first install and never
+# overwritten by an upgrade. The systemd unit points EASYDECOY_CONFIG here.
+# After editing:  sudo systemctl restart easydecoy
+
+log_level = "info"     # error | warn | info | debug | trace
+
+# One JSON object per line. /var/log/easydecoy is created by the unit's
+# LogsDirectory; /etc/logrotate.d/easydecoy rotates the file weekly.
+events_file = "/var/log/easydecoy/events.jsonl"
+
+max_connections    = 256
+idle_timeout_secs  = 30
+session_limit_secs = 120
+
+# The real ports. The service is granted CAP_NET_BIND_SERVICE, so it binds them
+# without running as root. A port another service on this host already uses
+# stops EasyDecoy at startup (journalctl -u easydecoy says which): move the
+# decoy to another port, or disable it.
+
+[telnet]
+enabled  = true
+bind     = "0.0.0.0:23"
+banner   = "Ubuntu 22.04.4 LTS"
+hostname = "fileserver01"
+
+[http]
+enabled       = true
+bind          = "0.0.0.0:80"
+server_header = "nginx/1.24.0"
+title         = "Admin Console"

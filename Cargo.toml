@@ -3,7 +3,7 @@ name = "easydecoy"
 version = "0.1.0"
 edition = "2024"
 authors = ["Yariv Hakim"]
-description = "EasyDecoy - decoy network services that tell you when someone is inside your network"
+description = "EasyDecoy - decoy network services that detect intruders"
 license = "MIT"
 repository = "https://github.com/easysysio/EasyDecoy"
 homepage = "https://github.com/easysysio/EasyDecoy"
@@ -31,3 +31,69 @@ anyhow = "1"
 
 # Event timestamps
 chrono = { version = "0.4", features = ["serde"] }
+
+# ─── Debian package (.deb) — cargo-deb ──────────────────────
+# Built natively per architecture in CI (.github/workflows/release.yml). The
+# default config is shipped to /usr/share and copied to /etc/easydecoy by the
+# post-install script only if absent, so upgrades never overwrite an admin's
+# config (it is intentionally NOT a dpkg conffile).
+[package.metadata.deb]
+maintainer = "Yariv Hakim <yariv.hakim@gmail.com>"
+copyright = "2026, Yariv Hakim <yariv.hakim@gmail.com>"
+# Installed as /usr/share/doc/easydecoy/copyright; MIT asks for the notice to
+# travel with the binary. 0 lines are skipped from the top.
+license-file = ["LICENSE", "0"]
+section = "net"
+priority = "optional"
+depends = "$auto"
+maintainer-scripts = "packaging/deb"
+extended-description = """\
+EasyDecoy runs decoy network services: a Telnet login and a web admin panel
+that look real but lead nowhere. Nobody legitimate has a reason to connect to
+them, so every connection is recorded as a JSON event worth a look."""
+assets = [
+    ["target/release/easydecoy",   "usr/bin/",                                "755"],
+    ["packaging/easydecoy.toml",   "usr/share/easydecoy/easydecoy.toml",      "644"],
+    ["packaging/easydecoy.service", "usr/lib/systemd/system/easydecoy.service", "644"],
+    # Run by the postinst; see the script for what it does and in what order.
+    ["packaging/post-install.sh",  "usr/lib/easydecoy/post-install",          "755"],
+    ["packaging/logrotate",        "etc/logrotate.d/easydecoy",               "644"],
+    ["README.md",                  "usr/share/doc/easydecoy/README.md",       "644"],
+    ["CHANGELOG.md",               "usr/share/doc/easydecoy/CHANGELOG.md",    "644"],
+]
+
+# ─── RPM package (.rpm) — cargo-generate-rpm ────────────────
+# Same payload as the .deb.
+[package.metadata.generate-rpm]
+summary = "EasyDecoy - decoy network services that record every connection"
+auto-req = "no"
+# The same script the Debian postinst runs, on a first install and on every
+# upgrade. See packaging/post-install.sh.
+post_install_script = """
+/usr/lib/easydecoy/post-install
+"""
+# Mirrors packaging/deb/prerm. rpm passes the number of remaining copies of the
+# package: 0 on a real removal, 1 during an upgrade — so the guard is what keeps
+# an upgrade from stopping the service the post-install step is about to
+# restart.
+pre_uninstall_script = """
+if [ "$1" = 0 ]; then
+    systemctl --no-reload disable easydecoy.service >/dev/null 2>&1 || :
+    systemctl stop easydecoy.service >/dev/null 2>&1 || :
+fi
+"""
+assets = [
+    { source = "target/release/easydecoy",    dest = "/usr/bin/easydecoy",                       mode = "755" },
+    { source = "packaging/easydecoy.toml",    dest = "/usr/share/easydecoy/easydecoy.toml",      mode = "644" },
+    { source = "packaging/easydecoy.service", dest = "/usr/lib/systemd/system/easydecoy.service", mode = "644" },
+    { source = "packaging/post-install.sh",   dest = "/usr/lib/easydecoy/post-install",          mode = "755" },
+    { source = "packaging/logrotate",         dest = "/etc/logrotate.d/easydecoy",               mode = "644", config = true },
+    # Where RPM-based distributions keep licence texts.
+    { source = "LICENSE",                     dest = "/usr/share/licenses/easydecoy/LICENSE",    mode = "644", doc = true },
+    { source = "README.md",                   dest = "/usr/share/doc/easydecoy/README.md",       mode = "644", doc = true },
+    { source = "CHANGELOG.md",                dest = "/usr/share/doc/easydecoy/CHANGELOG.md",    mode = "644", doc = true },
+]
+
+# groupadd and useradd, for the service account.
+[package.metadata.generate-rpm.requires]
+shadow-utils = "*"

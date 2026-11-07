@@ -14,6 +14,7 @@ mod config;
 mod decoy;
 mod event;
 
+use std::io::IsTerminal;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -98,8 +99,10 @@ async fn main() -> Result<()> {
 
     // Our own log goes to stderr: stdout is reserved for events when no events
     // file is configured. RUST_LOG still wins over the config's log_level.
+    // Colour only on a terminal, so journald doesn't store escape codes.
     tracing_subscriber::fmt()
         .with_writer(std::io::stderr)
+        .with_ansi(std::io::stderr().is_terminal())
         .with_env_filter(
             EnvFilter::try_from_default_env()
                 .unwrap_or_else(|_| EnvFilter::new(config.log_level.trim())),

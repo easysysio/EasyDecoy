@@ -12,7 +12,30 @@ but nothing a client sends is ever executed or passed to the host. Login
 attempts are recorded with the username and the password's *length*, never
 the password itself.
 
-## Quick start
+## Install
+
+Each [release](https://github.com/easysysio/EasyDecoy/releases) has `.deb` and
+`.rpm` packages for x86_64 and arm64.
+
+```sh
+sudo apt install ./easydecoy_<version>-1_amd64.deb     # Debian / Ubuntu
+sudo dnf install ./easydecoy-<version>-1.x86_64.rpm    # Fedora / RHEL
+```
+
+The package installs a systemd unit but does not start it. Look over
+`/etc/easydecoy/easydecoy.toml` first: the packaged config uses the real ports
+(23 and 80). Then:
+
+```sh
+sudo systemctl enable --now easydecoy
+sudo tail -f /var/log/easydecoy/events.jsonl
+```
+
+The service runs as its own unprivileged `easydecoy` account, with only the
+capability to bind ports below 1024. An upgrade keeps your config and restarts
+a running service.
+
+## Quick start (from source)
 
 ```sh
 cargo run | jq .

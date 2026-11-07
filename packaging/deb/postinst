@@ -1,0 +1,20 @@
+#!/bin/sh
+# =========================================================
+# postinst — EasyDecoy (Debian/Ubuntu)
+# Runs after the package is unpacked and configured, on a
+# first install and on every upgrade.
+#
+# Everything it does is in /usr/lib/easydecoy/post-install,
+# which the RPM runs too: the account the service runs as,
+# the default config, and bringing a running service onto
+# the new binary.
+# =========================================================
+set -e
+
+case "$1" in
+    configure)
+        /usr/lib/easydecoy/post-install
+        ;;
+esac
+
+exit 0
