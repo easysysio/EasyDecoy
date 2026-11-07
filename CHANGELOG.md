@@ -22,3 +22,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Limits on concurrent sessions, idle time and session length.
 - `.deb` and `.rpm` packages for x86_64 and arm64, with a hardened systemd unit
   that runs EasyDecoy as its own unprivileged account.
+- Documentation site at [easydecoy.easysys.io](https://easydecoy.easysys.io).
