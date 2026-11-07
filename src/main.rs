@@ -13,6 +13,7 @@
 mod config;
 mod decoy;
 mod event;
+mod syslog;
 
 use std::io::IsTerminal;
 use std::sync::Arc;
@@ -115,11 +116,22 @@ async fn main() -> Result<()> {
         tracing::info!("config: {config_path} not found, running with defaults");
     }
 
-    let events = event::spawn_writer(&config.events_file).await?;
+    let syslog = config.syslog.enabled.then(|| syslog::spawn(&config.syslog));
+    let events = event::spawn_writer(&config.events_file, syslog).await?;
     tracing::info!(
         "events: {}",
         if config.events_file.trim().is_empty() { "stdout" } else { config.events_file.trim() }
     );
+    if config.syslog.enabled {
+        let s = &config.syslog;
+        tracing::info!(
+            "syslog: {} to {} ({}, {})",
+            format!("{:?}", s.protocol).to_lowercase(),
+            s.server,
+            format!("{:?}", s.format).to_lowercase(),
+            format!("{:?}", s.facility).to_lowercase(),
+        );
+    }
 
     let shared = Shared {
         events,

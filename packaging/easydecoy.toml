@@ -30,3 +30,16 @@ enabled       = true
 bind          = "0.0.0.0:80"
 server_header = "nginx/1.24.0"
 title         = "Admin Console"
+
+# Send every event to a syslog collector as well, e.g. EasyLog. The message
+# text is the event's JSON line; login attempts are sent at severity warning,
+# everything else at notice. Events are always written to events_file first,
+# so a collector that is down only costs dropped messages (reported in
+# journalctl -u easydecoy).
+[syslog]
+enabled  = false
+server   = "127.0.0.1:514"    # host:port of the collector
+protocol = "udp"              # udp | tcp (newline-framed)
+format   = "rfc5424"          # rfc5424 | rfc3164
+facility = "local0"           # user | daemon | auth | authpriv | local0 … local7
+hostname = ""                 # empty uses this machine's name

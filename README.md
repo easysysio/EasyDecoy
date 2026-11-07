@@ -66,6 +66,30 @@ One JSON object per line:
 | `http`   | `login_attempt` | as `request`, plus `username`, `password_length`      |
 | `http`   | `non_http`      | `sample`: the start of what the client sent           |
 
+## Syslog
+
+To send every event to a collector such as EasyLog as well, enable the
+`[syslog]` section:
+
+```toml
+[syslog]
+enabled  = true
+server   = "10.0.0.5:514"
+protocol = "udp"        # or "tcp"
+```
+
+Each event becomes one syslog message whose text is its JSON line. Login
+attempts go at severity *warning*, everything else at *notice*. In the
+default RFC 5424 format, the event's kind is also the message ID:
+
+```
+<132>1 2026-11-07T11:20:40.409Z sensor1 easydecoy - login_attempt - {"time":…}
+```
+
+Events are always written locally first. A collector that is down costs only
+the messages sent while it was down; EasyDecoy reports that in its own log and
+carries on.
+
 ## Configuration
 
 Settings live in a TOML file read from `EASYDECOY_CONFIG` (default:

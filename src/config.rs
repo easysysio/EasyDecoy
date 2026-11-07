@@ -28,6 +28,7 @@ pub struct Config {
     pub session_limit_secs: u64,
     pub telnet: TelnetConfig,
     pub http: HttpConfig,
+    pub syslog: SyslogConfig,
 }
 
 impl Default for Config {
@@ -40,6 +41,7 @@ impl Default for Config {
             session_limit_secs: 120,
             telnet: TelnetConfig::default(),
             http: HttpConfig::default(),
+            syslog: SyslogConfig::default(),
         }
     }
 }
@@ -92,6 +94,87 @@ impl Default for HttpConfig {
     }
 }
 
+/// Sending every event to a syslog collector as well (see src/syslog.rs).
+#[derive(Debug, Clone, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct SyslogConfig {
+    pub enabled: bool,
+    /// The collector, as host:port. A name is resolved again for each message.
+    pub server: String,
+    pub protocol: SyslogProtocol,
+    pub format: SyslogFormat,
+    pub facility: Facility,
+    /// The HOSTNAME field. Empty uses this machine's name.
+    pub hostname: String,
+}
+
+impl Default for SyslogConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            server: "127.0.0.1:514".to_string(),
+            protocol: SyslogProtocol::Udp,
+            format: SyslogFormat::Rfc5424,
+            facility: Facility::Local0,
+            hostname: String::new(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum SyslogProtocol {
+    Udp,
+    Tcp,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum SyslogFormat {
+    /// Full UTC timestamp with milliseconds, and the event kind as MSGID.
+    Rfc5424,
+    /// The older BSD format, for collectors that read nothing else.
+    Rfc3164,
+}
+
+/// The syslog facilities it makes sense to file decoy events under.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Facility {
+    User,
+    Daemon,
+    Auth,
+    Authpriv,
+    Local0,
+    Local1,
+    Local2,
+    Local3,
+    Local4,
+    Local5,
+    Local6,
+    Local7,
+}
+
+impl Facility {
+    /// The facility's number (RFC 5424 §6.2.1).
+    pub fn code(self) -> u8 {
+        match self {
+            Self::User => 1,
+            Self::Daemon => 3,
+            Self::Auth => 4,
+            Self::Authpriv => 10,
+            Self::Local0 => 16,
+            Self::Local1 => 17,
+            Self::Local2 => 18,
+            Self::Local3 => 19,
+            Self::Local4 => 20,
+            Self::Local5 => 21,
+            Self::Local6 => 22,
+            Self::Local7 => 23,
+        }
+    }
+}
+
 impl Config {
     // ─────────────────────────────────────────────────────────────────────────
     // load(path)
@@ -105,8 +188,22 @@ impl Config {
             return Ok((Self::default(), false));
         }
         let text = std::fs::read_to_string(path).with_context(|| format!("reading {path}"))?;
-        let config = toml::from_str(&text).with_context(|| format!("parsing {path}"))?;
+        let config: Self = toml::from_str(&text).with_context(|| format!("parsing {path}"))?;
+        config.check().with_context(|| format!("checking {path}"))?;
         Ok((config, true))
+    }
+
+    /// What parsing alone cannot catch.
+    fn check(&self) -> Result<()> {
+        if self.syslog.enabled {
+            // A missing port would otherwise surface only as a failed send,
+            // when the first event arrives.
+            let port = self.syslog.server.rsplit_once(':').and_then(|(_, p)| p.parse::<u16>().ok());
+            if port.is_none_or(|p| p == 0) {
+                anyhow::bail!("syslog server {:?} must be host:port, e.g. 10.0.0.5:514", self.syslog.server);
+            }
+        }
+        Ok(())
     }
 }
 
@@ -125,5 +222,39 @@ mod tests {
     #[test]
     fn a_misspelled_key_is_an_error() {
         assert!(toml::from_str::<Config>("[telnet]\nenabeld = false\n").is_err());
+    }
+
+    #[test]
+    fn reads_the_syslog_choices() {
+        let config: Config =
+            toml::from_str("[syslog]\nenabled = true\nprotocol = \"tcp\"\nfacility = \"auth\"\n").unwrap();
+        assert_eq!(config.syslog.protocol, SyslogProtocol::Tcp);
+        assert_eq!(config.syslog.facility.code(), 4);
+        assert_eq!(config.syslog.format, SyslogFormat::Rfc5424);
+        assert!(toml::from_str::<Config>("[syslog]\nprotocol = \"tls\"\n").is_err());
+        assert!(toml::from_str::<Config>("[syslog]\nfacility = \"kern\"\n").is_err());
+    }
+
+    #[test]
+    fn the_shipped_configs_are_valid() {
+        for text in [include_str!("../config/easydecoy.toml"), include_str!("../packaging/easydecoy.toml")] {
+            let config: Config = toml::from_str(text).unwrap();
+            config.check().unwrap();
+        }
+    }
+
+    #[test]
+    fn a_syslog_server_needs_a_port() {
+        let check = |server: &str| {
+            let mut config = Config::default();
+            config.syslog.enabled = true;
+            config.syslog.server = server.to_string();
+            config.check()
+        };
+        assert!(check("10.0.0.5:514").is_ok());
+        assert!(check("[fd00::5]:514").is_ok());
+        assert!(check("logs.example.com:6514").is_ok());
+        assert!(check("10.0.0.5").is_err());
+        assert!(check("10.0.0.5:0").is_err());
     }
 }

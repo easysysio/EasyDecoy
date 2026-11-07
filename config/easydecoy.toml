@@ -33,3 +33,14 @@ enabled       = true
 bind          = "0.0.0.0:8080"
 server_header = "nginx/1.24.0"    # empty leaves the Server header out
 title         = "Admin Console"
+
+# Send every event to a syslog collector as well, e.g. EasyLog. The message
+# text is the event's JSON line. Syslog is a copy: events are always written
+# locally first, and a collector that is down only costs dropped messages.
+[syslog]
+enabled  = false
+server   = "127.0.0.1:514"    # host:port
+protocol = "udp"              # udp | tcp (newline-framed)
+format   = "rfc5424"          # rfc5424 | rfc3164
+facility = "local0"           # user | daemon | auth | authpriv | local0 … local7
+hostname = ""                 # empty uses this machine's name

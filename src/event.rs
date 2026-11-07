@@ -10,6 +10,10 @@
 // writer means lines from concurrent sessions never interleave; the bound
 // means a flood of connections slows the decoys down rather than filling
 // memory with unwritten events.
+//
+// With [syslog] enabled, the writer also passes each line on to the syslog
+// sender, after the local copy is written and without waiting for it (see
+// src/syslog.rs).
 // =============================================================================
 
 use std::net::{IpAddr, SocketAddr};
@@ -20,6 +24,8 @@ use serde::Serialize;
 use serde_json::{Map, Value};
 use tokio::io::AsyncWriteExt;
 use tokio::sync::mpsc;
+
+use crate::syslog::SyslogTx;
 
 // Events waiting to be written before decoys start waiting for the writer.
 const QUEUE: usize = 1024;
@@ -71,13 +77,13 @@ impl EventTx {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// spawn_writer(path)
+// spawn_writer(path, syslog)
 // Opens the events file (appending; empty path means stdout) and starts the
-// task that writes every event sent to the returned EventTx. Opening happens
-// here, before any decoy starts, so a bad path stops EasyDecoy at startup
-// instead of losing events later.
+// task that writes every event sent to the returned EventTx, copying each to
+// `syslog` when there is one. Opening happens here, before any decoy starts,
+// so a bad path stops EasyDecoy at startup instead of losing events later.
 // ─────────────────────────────────────────────────────────────────────────────
-pub async fn spawn_writer(path: &str) -> Result<EventTx> {
+pub async fn spawn_writer(path: &str, syslog: Option<SyslogTx>) -> Result<EventTx> {
     let path = path.trim();
     let mut file = if path.is_empty() {
         None
@@ -115,6 +121,9 @@ pub async fn spawn_writer(path: &str) -> Result<EventTx> {
             };
             if let Err(e) = written {
                 tracing::error!("event could not be written: {e}");
+            }
+            if let Some(syslog) = &syslog {
+                syslog.send(event.time, event.kind, line.trim_end());
             }
         }
     });
