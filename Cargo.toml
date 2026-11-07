@@ -94,6 +94,8 @@ assets = [
     { source = "CHANGELOG.md",                dest = "/usr/share/doc/easydecoy/CHANGELOG.md",    mode = "644", doc = true },
 ]
 
-# groupadd and useradd, for the service account.
+# groupadd and useradd, for the service account. Required by path rather than
+# by package: Fedora and RHEL ship them in shadow-utils, openSUSE in shadow.
 [package.metadata.generate-rpm.requires]
-shadow-utils = "*"
+"/usr/sbin/useradd" = "*"
+"/usr/sbin/groupadd" = "*"
