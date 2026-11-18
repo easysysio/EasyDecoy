@@ -11,7 +11,9 @@
 // replies, but nothing a client sends is ever executed or passed to the host.
 // =============================================================================
 
+pub mod ftp;
 pub mod http;
+mod lines;
 pub mod telnet;
 
 use std::future::Future;

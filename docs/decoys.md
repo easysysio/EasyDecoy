@@ -56,11 +56,44 @@ A small appliance's web interface:
 - Something that isn't HTTP, such as an SSH client or a protocol probe, is
   recorded as `non_http` with a `sample`: the first 64 bytes it sent. A client
   that sends a few bytes and waits is recorded when it gives up, goes quiet
-  for `idle_timeout_secs`, or has sent 8 KiB without a complete request.
+  for the idle timeout, or has sent 8 KiB without a complete request.
 
 The decoy handles one request per connection and closes it (`Connection:
 close`). The request head may be at most **8 KiB** and the body at most
 **4 KiB**. Anything longer is cut off, not buffered.
+
+## FTP
+
+A file server that never lets anyone in, answering the way vsftpd does with
+anonymous logins turned off:
+
+```text
+220 (vsFTPd 3.0.5)
+USER admin
+331 Please specify the password.
+PASS ********
+530 Login incorrect.
+```
+
+- The greeting is `220` followed by the **banner**.
+- Every login fails after a **1-second** pause, `anonymous` included. After
+  **three** failed logins the connection is closed, as vsftpd does.
+- Each try is recorded as a `login_attempt` with the `username` and the
+  `password_length`, never the password. An anonymous login's "password" is
+  usually an email address, so that isn't kept either.
+- Nobody gets past the login, so there is no data connection and no file to
+  read. Anything that would need a login gets
+  `530 Please login with USER and PASS.`
+
+What a client sends on its way to a login (`FEAT`, `SYST`, `AUTH TLS`, `OPTS`,
+`NOOP`, `HELP`, `QUIT` and the like) is answered and not recorded. Any other
+command, such as `SITE EXEC`, `RETR` or `PORT` sent without a login, is
+recorded as a `command` event with the `command` and its `argument`: an
+ordinary client has no reason to send it. A connection is closed after 50
+commands, and a line longer than 1024 bytes is cut off rather than buffered.
+
+The packaged service starts it on port **21**. An upgrade from 0.1.0, which
+had no FTP decoy, leaves it off; turn it on from the **Decoys** page.
 
 ## Making them believable
 
@@ -68,7 +101,9 @@ A decoy only works if an intruder believes it.
 
 - **Name it like your real machines.** If your file servers are called
   `fs-ams-02`, a `fileserver01` stands out. On the GUI's **Decoys** page, set
-  the hostname, banner, Server header and page title to fit in.
+  the hostname, banners, Server header and page title to fit in. A file
+  server whose FTP greeting says ProFTPD where your others run vsftpd is a
+  tell.
 - **Give it an address nothing uses.** No legitimate client should have any
   reason to reach it, so every event means something.
 - **Keep it out of anything that would be used normally.** Don't put the

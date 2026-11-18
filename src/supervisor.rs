@@ -1,7 +1,7 @@
 // =============================================================================
 // supervisor.rs — keeps the decoys running as the settings say
 //
-// Each enabled decoy runs in its own task. When a decoy's settings change in
+// Each enabled decoy (Telnet, HTTP, FTP) runs in its own task. When a decoy's settings change in
 // the GUI, only that decoy is restarted (its listener closed and opened again,
 // its open sessions ended); a change to the limits restarts them all, since
 // they share one session limit.
@@ -19,6 +19,7 @@ use serde::Serialize;
 use tokio::sync::Semaphore;
 use tokio::task::JoinHandle;
 
+use crate::decoy::ftp::Ftp;
 use crate::decoy::http::Http;
 use crate::decoy::telnet::Telnet;
 use crate::decoy::{self, Decoy, Shared};
@@ -78,6 +79,7 @@ pub fn spawn(settings: SettingsStore, events: EventTx) -> (StatusMap, JoinHandle
         let mut shared = shared(&events, &s.limits);
         let mut telnet = start_telnet(&s, &shared, &map);
         let mut http = start_http(&s, &shared, &map);
+        let mut ftp = start_ftp(&s, &shared, &map);
 
         while watch.changed().await.is_ok() {
             let new = watch.borrow_and_update().clone();
@@ -94,11 +96,15 @@ pub fn spawn(settings: SettingsStore, events: EventTx) -> (StatusMap, JoinHandle
                 drop(http.take());
                 http = start_http(&new, &shared, &map);
             }
+            if limits || new.ftp != s.ftp {
+                drop(ftp.take());
+                ftp = start_ftp(&new, &shared, &map);
+            }
             s = new;
         }
         // The settings store is gone: keep the decoys as they are.
         std::future::pending::<()>().await;
-        drop((telnet, http));
+        drop((telnet, http, ftp));
     });
     (status, handle)
 }
@@ -120,6 +126,11 @@ fn start_telnet(s: &Settings, shared: &Shared, status: &StatusMap) -> Option<Tas
 fn start_http(s: &Settings, shared: &Shared, status: &StatusMap) -> Option<Task> {
     let h = &s.http;
     start(h.enabled, Http::new(h), &h.bind, shared, status)
+}
+
+fn start_ftp(s: &Settings, shared: &Shared, status: &StatusMap) -> Option<Task> {
+    let f = &s.ftp;
+    start(f.enabled, Ftp::new(f), &f.bind, shared, status)
 }
 
 fn start<D: Decoy>(enabled: bool, decoy: D, bind: &str, shared: &Shared, status: &StatusMap) -> Option<Task> {
@@ -171,6 +182,7 @@ mod tests {
         let mut s = Settings::default();
         s.telnet.bind = "127.0.0.1:0".into();
         s.http.enabled = false;
+        s.ftp.bind = "127.0.0.1:0".into();
         store.save(s.clone()).await.unwrap();
 
         let (events, _writer) = crate::event::spawn_writer(db, store.clone()).await;
@@ -178,6 +190,8 @@ mod tests {
         let running = wait_for(&status, "telnet", |s| matches!(s, Status::Running(_))).await;
         assert_eq!(running, Status::Running("127.0.0.1:0".into()));
         assert_eq!(status.get("http"), Status::Disabled);
+        let ftp = wait_for(&status, "ftp", |s| matches!(s, Status::Running(_))).await;
+        assert_eq!(ftp, Status::Running("127.0.0.1:0".into()));
 
         // A bind that can't work is reported, not fatal.
         s.telnet.bind = "192.0.2.1:2323".into();

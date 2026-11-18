@@ -123,6 +123,9 @@ impl Config {
             return None;
         }
         let mut s = Settings::default();
+        // 0.1.0 had no FTP decoy: an upgrade doesn't open a port it didn't
+        // have. It can be turned on in the GUI.
+        s.ftp.enabled = false;
         if let Some(v) = &self.events_file {
             // 0.1.0 wrote to stdout when events_file was empty; 0.2.0 spells
             // that "-", and empty means the database alone.
@@ -202,6 +205,7 @@ protocol = "tcp"
         assert_eq!(s.telnet.hostname, "fs-ams-03");
         assert_eq!(s.telnet.banner, "Ubuntu 22.04.4 LTS");
         assert!(!s.http.enabled);
+        assert!(!s.ftp.enabled, "0.1.0 had no FTP decoy");
         assert_eq!(s.syslog.protocol, SyslogProtocol::Tcp);
         // An empty events_file was stdout in 0.1.0, and stays stdout.
         let stdout: Config = toml::from_str("events_file = \"\"\n").unwrap();

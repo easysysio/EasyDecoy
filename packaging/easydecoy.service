@@ -15,8 +15,9 @@ RestartSec=2
 
 # An account of its own, never root. A decoy is the one service built to be
 # found by an intruder, and all it needs beyond an ordinary user is to bind the
-# real ports (23, 80). The management GUI listens on 127.0.0.1:9443 by default. The package creates the account
-# (packaging/post-install.sh, run after every install and upgrade).
+# real ports (23, 80, 21). The management GUI listens on 127.0.0.1:9443 by
+# default. The package creates the account (packaging/post-install.sh, run
+# after every install and upgrade).
 User=easydecoy
 Group=easydecoy
 AmbientCapabilities=CAP_NET_BIND_SERVICE

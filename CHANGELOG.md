@@ -11,6 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- FTP decoy: a vsftpd-style server that refuses every login, anonymous
+  included, and closes after three. Login attempts are recorded with the
+  username and password length; other commands sent without a login (`SITE`,
+  `RETR`, `PORT`, ...) are recorded as `command` events. On port 21 under the
+  packaged service; an upgrade from 0.1.0 leaves it off.
 - Management GUI over HTTPS: a dashboard (events, login attempts, sources, a
   timeline, the top sources, usernames and paths), a filterable event list
   with JSON-lines export, and pages for the decoys, limits, retention, syslog

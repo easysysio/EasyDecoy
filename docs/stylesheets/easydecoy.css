@@ -23,8 +23,6 @@ body:has(.es-home) .md-footer {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 24px;
 }
-/* The card about every decoy spans the row under the two it describes. */
-.ed-type-wide { grid-column: 1 / -1; }
 
 .ed-type {
   display: flex;

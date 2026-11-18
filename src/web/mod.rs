@@ -115,6 +115,7 @@ pub fn gui_warning(gui: SocketAddr, settings: &Settings) -> Option<String> {
     let decoys = [
         (settings.telnet.enabled, &settings.telnet.bind),
         (settings.http.enabled, &settings.http.bind),
+        (settings.ftp.enabled, &settings.ftp.bind),
     ];
     let shared = decoys.iter().any(|(enabled, bind)| {
         *enabled && bind.trim().parse::<SocketAddr>().is_ok_and(|b| b.ip() == ip || b.ip().is_unspecified())
@@ -139,6 +140,7 @@ pub fn router(state: AppState) -> Router {
         .route("/decoys", get(pages::decoys))
         .route("/decoys/telnet", post(pages::save_telnet))
         .route("/decoys/http", post(pages::save_http))
+        .route("/decoys/ftp", post(pages::save_ftp))
         .route("/settings", get(pages::settings))
         .route("/settings/general", post(pages::save_general))
         .route("/settings/syslog", post(pages::save_syslog))
@@ -284,6 +286,9 @@ mod tests {
         let mut s = Settings::default();
         s.telnet.bind = "203.0.113.5:23".into();
         s.http.bind = "203.0.113.5:80".into();
+        s.ftp.bind = "0.0.0.0:21".into();
+        assert!(gui_warning("10.9.0.1:9443".parse().unwrap(), &s).is_some(), "FTP is on every address");
+        s.ftp.bind = "203.0.113.5:21".into();
         assert!(gui_warning("10.9.0.1:9443".parse().unwrap(), &s).is_none(), "a management address");
         assert!(gui_warning("203.0.113.5:9443".parse().unwrap(), &s).is_some());
     }

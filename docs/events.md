@@ -22,7 +22,7 @@ Each event can also go, as the same JSON line, to:
 | Field | What it is |
 |---|---|
 | `time` | When it happened: UTC, RFC 3339, always to the microsecond |
-| `decoy` | `telnet` or `http` |
+| `decoy` | `telnet`, `http` or `ftp` |
 | `kind` | What happened; see below |
 | `src_ip` | The client's address. An IPv4 client of a dual-stack listener is shown as plain IPv4. |
 | `src_port` | The client's port |
@@ -37,6 +37,8 @@ Each event can also go, as the same JSON line, to:
 | `request` | `http` | `method`, `path`, `host`, `user_agent` |
 | `login_attempt` | `http` | as `request`, plus `username`, `password_length` |
 | `non_http` | `http` | `sample`: the first 64 bytes the client sent |
+| `login_attempt` | `ftp` | `username`, `password_length` |
+| `command` | `ftp` | `command`, and `argument` when there is one: a command sent without a login that an ordinary client wouldn't send |
 
 A field the client didn't send, such as a request with no `User-Agent`, is
 left out rather than recorded as empty.
@@ -54,8 +56,8 @@ it is written:
 
 - Control characters, including newlines and terminal escapes, become `.`,
   so a client cannot forge a log line or recolour your terminal.
-- Each field is cut to a fixed length: `method` 16 characters, `username` 128,
-  `host` and `user_agent` 256, `path` 512.
+- Each field is cut to a fixed length: `method` and `command` 16 characters,
+  `username` 128, `host`, `user_agent` and `argument` 256, `path` 512.
 
 ## Reading events with jq
 

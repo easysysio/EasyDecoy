@@ -33,7 +33,7 @@ GitHub
 <div class="es-hero-copy es-rise">
 <div class="es-eyebrow"><span class="es-eyebrow-dot"></span>Honeypot · part of EasySYS</div>
 <h1 class="es-h1">Nobody should knock. When someone does, you'll know.</h1>
-<p class="es-lead">EasyDecoy runs fake network services, a Telnet login and a web admin panel, that look real and lead nowhere. Nothing legitimate ever connects to them, so every connection, request and login attempt is worth a look. Each one is recorded, shown on a web dashboard, and can be forwarded over syslog.</p>
+<p class="es-lead">EasyDecoy runs fake network services, a Telnet login, a web admin panel and an FTP server, that look real and lead nowhere. Nothing legitimate ever connects to them, so every connection, request and login attempt is worth a look. Each one is recorded, shown on a web dashboard, and can be forwarded over syslog.</p>
 <div class="es-actions">
 <a class="es-btn es-btn--primary es-btn--lg" href="#install">
 Get started
@@ -68,7 +68,7 @@ Login incorrect
    "src_ip":"10.0.4.17","username":"admin",
    "password_length":8}</div>
 <div class="es-term-meta">
-<div><div class="es-term-meta-label">Decoys</div><div class="es-term-meta-value es-mono">telnet · http</div></div>
+<div><div class="es-term-meta-label">Decoys</div><div class="es-term-meta-value es-mono">telnet · http · ftp</div></div>
 <div><div class="es-term-meta-label">Events</div><div class="es-term-meta-value es-mono">JSON · syslog</div></div>
 <div><div class="es-term-meta-label">Arch</div><div class="es-term-meta-value es-mono">x86_64 · arm64</div></div>
 </div>
@@ -93,7 +93,7 @@ Login incorrect
 <div class="es-head">
 <div>
 <span class="es-kicker-lg">Decoys</span>
-<h2 class="es-h2">Two services, built to be found.</h2>
+<h2 class="es-h2">Three services, built to be found.</h2>
 </div>
 <p class="es-desc">Each decoy answers like the real thing for long enough to be convincing, then refuses. Nothing a client sends is ever run or passed to the host: the decoys only imitate prompts and replies.</p>
 </div>
@@ -118,14 +118,24 @@ Login incorrect
 <p class="es-product-text">An appliance-style sign-in page on <code>/</code> and <code>/login</code>, a 404 everywhere else, and every sign-in refused. Each request is recorded with its path, Host and User-Agent.</p>
 <div class="es-tags"><span class="es-tag">connect</span><span class="es-tag">request</span><span class="es-tag">login_attempt</span><span class="es-tag">non_http</span></div>
 </div>
-<div class="es-card ed-type ed-type-wide">
+<div class="es-card ed-type">
+<div class="ed-type-top">
+<div class="es-icon"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"></path><path d="M12 11v5M9.5 13.5L12 16l2.5-2.5"></path></svg></div>
+<span class="es-tag es-mono">:21</span>
+</div>
+<span class="es-kicker">FTP</span>
+<h3 class="es-h3">A file server that never opens</h3>
+<p class="es-product-text">A vsftpd-style greeting, <code>USER</code> and <code>PASS</code>, and <code>530 Login incorrect</code> for everyone, <code>anonymous</code> included. Commands sent without a login, such as <code>SITE EXEC</code>, are recorded too.</p>
+<div class="es-tags"><span class="es-tag">connect</span><span class="es-tag">login_attempt</span><span class="es-tag">command</span></div>
+</div>
+<div class="es-card ed-type">
 <div class="ed-type-top">
 <div class="es-icon"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"></path><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4 12.5-12.5z"></path></svg></div>
 <span class="es-tag es-mono">GUI</span>
 </div>
 <span class="es-kicker">Made to look like yours</span>
 <h3 class="es-h3">Named the way your real machines are</h3>
-<p class="es-product-text">A decoy called <code>fileserver01</code> on a network of <code>fs-ams-02</code>s stands out. From the GUI, set the banner, the hostname in the prompt, the web server's <code>Server</code> header and the sign-in page's title to match what an intruder expects to find. Each decoy restarts as you save it.</p>
+<p class="es-product-text">A decoy called <code>fileserver01</code> on a network of <code>fs-ams-02</code>s stands out. From the GUI, set the banners, the hostname in the prompt, the web server's <code>Server</code> header and the sign-in page's title to match what an intruder expects to find. Each decoy restarts as you save it.</p>
 <div class="es-tags"><span class="es-tag">banner</span><span class="es-tag">hostname</span><span class="es-tag">server_header</span><span class="es-tag">title</span></div>
 </div>
 </div>
@@ -181,7 +191,7 @@ Login incorrect
 </div>
 <div class="es-diagram">
 <div class="es-diagram-scroll">
-<svg viewBox="0 0 1120 440" role="img" aria-label="Diagram: port scans, intruders and malware reach the Telnet and HTTP decoys inside EasyDecoy; both report to an event writer, which stores events in a SQLite database that administrators read through the web GUI, and sends a copy over syslog to EasyLog or another collector.">
+<svg viewBox="0 0 1120 440" role="img" aria-label="Diagram: port scans, intruders and malware reach the Telnet, HTTP and FTP decoys inside EasyDecoy; each reports to an event writer, which stores events in a SQLite database that administrators read through the web GUI, and sends a copy over syslog to EasyLog or another collector.">
 <defs>
 <marker id="ed-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="a-head" d="M0 0L10 5L0 10z"></path></marker>
 <marker id="ed-ahb" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="a-head a-head--es" d="M0 0L10 5L0 10z"></path></marker>
@@ -193,21 +203,23 @@ Login incorrect
 <g class="a-ext"><rect x="0" y="182" width="220" height="76" rx="10"></rect><text class="a-title" x="20" y="214">Intruders</text><text class="a-sub" x="20" y="238">moving between hosts</text></g>
 <g class="a-ext"><rect x="0" y="318" width="220" height="88" rx="10"></rect><text class="a-title" x="20" y="354">Malware</text><text class="a-sub" x="20" y="380">worms · botnets</text></g>
 <g class="a-es"><rect x="300" y="30" width="560" height="386" rx="14"></rect><text class="a-title" x="324" y="66">EasyDecoy</text><text class="a-sub" x="324" y="90">one binary · own account · sandboxed</text></g>
-<g class="a-box"><rect x="324" y="132" width="150" height="80" rx="10"></rect><text class="a-title" x="340" y="164">Telnet decoy</text><text class="a-sub" x="340" y="188">:23 login</text></g>
-<g class="a-box"><rect x="324" y="292" width="150" height="92" rx="10"></rect><text class="a-title" x="340" y="328">HTTP decoy</text><text class="a-sub" x="340" y="354">:80 sign-in</text></g>
+<g class="a-box"><rect x="324" y="112" width="150" height="72" rx="10"></rect><text class="a-title" x="340" y="142">Telnet decoy</text><text class="a-sub" x="340" y="166">:23 login</text></g>
+<g class="a-box"><rect x="324" y="212" width="150" height="72" rx="10"></rect><text class="a-title" x="340" y="242">HTTP decoy</text><text class="a-sub" x="340" y="266">:80 sign-in</text></g>
+<g class="a-box"><rect x="324" y="312" width="150" height="72" rx="10"></rect><text class="a-title" x="340" y="342">FTP decoy</text><text class="a-sub" x="340" y="366">:21 login</text></g>
 <g class="a-box"><rect x="505" y="212" width="150" height="80" rx="10"></rect><text class="a-title" x="521" y="244">Event writer</text><text class="a-sub" x="521" y="268">one JSON line</text></g>
 <g class="a-box"><rect x="686" y="132" width="150" height="80" rx="10"></rect><text class="a-title" x="702" y="164">Database</text><text class="a-sub" x="702" y="188">SQLite · web GUI</text></g>
 <g class="a-box"><rect x="686" y="292" width="150" height="92" rx="10"></rect><text class="a-title" x="702" y="328">Syslog</text><text class="a-sub" x="702" y="354">UDP · TCP</text></g>
 <g class="a-ext"><rect x="900" y="134" width="220" height="76" rx="10"></rect><text class="a-title" x="920" y="166">Administrators</text><text class="a-sub" x="920" y="190">HTTPS · SSH tunnel</text></g>
 <g class="a-es"><rect x="900" y="294" width="220" height="88" rx="10"></rect><text class="a-title" x="922" y="330">EasyLog</text><text class="a-sub" x="922" y="356">or any collector</text></g>
-<path class="a-line" fill="none" d="M220 84 H262 V160 H322" marker-end="url(#ed-ah)"></path>
+<path class="a-line" fill="none" d="M220 84 H262 V148 H322" marker-end="url(#ed-ah)"></path>
 <text class="a-label" x="226" y="76">telnet</text>
-<path class="a-line" fill="none" d="M220 220 H276 V326 H322" marker-end="url(#ed-ah)"></path>
+<path class="a-line" fill="none" d="M220 220 H276 V248 H322" marker-end="url(#ed-ah)"></path>
 <text class="a-label" x="226" y="212">http</text>
-<path class="a-line" fill="none" d="M220 362 H262 V350 H322" marker-end="url(#ed-ah)"></path>
-<text class="a-label" x="226" y="354">http</text>
-<path class="a-line a-line--es" fill="none" d="M474 172 H490 V236 H503" marker-end="url(#ed-ahb)"></path>
-<path class="a-line a-line--es" fill="none" d="M474 338 H490 V268 H503" marker-end="url(#ed-ahb)"></path>
+<path class="a-line" fill="none" d="M220 362 H262 V348 H322" marker-end="url(#ed-ah)"></path>
+<text class="a-label" x="226" y="354">ftp</text>
+<path class="a-line a-line--es" fill="none" d="M474 148 H490 V236 H503" marker-end="url(#ed-ahb)"></path>
+<path class="a-line a-line--es" fill="none" d="M474 248 H503" marker-end="url(#ed-ahb)"></path>
+<path class="a-line a-line--es" fill="none" d="M474 348 H490 V268 H503" marker-end="url(#ed-ahb)"></path>
 <path class="a-line a-line--es" fill="none" d="M655 240 H670 V172 H684" marker-end="url(#ed-ahb)"></path>
 <path class="a-line a-line--es" fill="none" d="M655 264 H670 V338 H684" marker-end="url(#ed-ahb)"></path>
 <line class="a-line" x1="836" y1="172" x2="898" y2="172" marker-end="url(#ed-ah)"></line>

@@ -187,6 +187,7 @@ impl EventRow {
                 user => format!("{} {} · {user}", text("method"), text("path")),
             },
             "non_http" => text("sample"),
+            "command" => format!("{} {}", text("command"), text("argument")).trim_end().to_string(),
             _ => String::new(),
         };
         const COMMON: [&str; 6] = ["time", "decoy", "kind", "src_ip", "src_port", "dst_port"];

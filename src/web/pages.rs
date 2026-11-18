@@ -5,7 +5,7 @@
 //                paths, the decoys' status and the latest events
 //   /events      every event, filtered and paged; /events/export streams the
 //                same selection as JSON lines
-//   /decoys      each decoy's status and settings
+//   /decoys      each decoy's status and settings (Telnet, HTTP, FTP)
 //   /settings    limits, recording (retention, events file) and syslog
 //   /account     the password, and the audit trail
 //
@@ -71,6 +71,13 @@ fn statuses(state: &AppState, s: &Settings) -> Vec<DecoyStatus> {
             icon: "bi-globe2",
             bind: s.http.bind.clone(),
             status: state.status.get("http"),
+        },
+        DecoyStatus {
+            name: "ftp",
+            label: "FTP",
+            icon: "bi-folder2-open",
+            bind: s.ftp.bind.clone(),
+            status: state.status.get("ftp"),
         },
     ]
 }
@@ -154,7 +161,7 @@ pub async fn events(
     ctx.insert("prev_url", &prev);
     ctx.insert("next_url", &next);
     ctx.insert("export_url", &events_url("/events/export", &filter, None));
-    ctx.insert("kinds", &["connect", "login_attempt", "request", "non_http"]);
+    ctx.insert("kinds", &["connect", "login_attempt", "request", "non_http", "command"]);
     state.render("events.html", ctx)
 }
 
@@ -218,6 +225,14 @@ pub struct TelnetForm {
     bind: String,
     banner: String,
     hostname: String,
+}
+
+#[derive(Deserialize)]
+pub struct FtpForm {
+    csrf: String,
+    enabled: Option<String>,
+    bind: String,
+    banner: String,
 }
 
 #[derive(Deserialize)]
@@ -300,6 +315,25 @@ pub async fn save_http(
     match save(&state, &user, peer, new.clone(), "save_http", &["http"]).await? {
         None => Ok(Redirect::to("/decoys?saved=http").into_response()),
         Some(problem) => Ok(decoys_page(&state, &user, &new, "", Some(("http", problem)))?.into_response()),
+    }
+}
+
+pub async fn save_ftp(
+    State(state): State<AppState>,
+    Extension(user): Extension<User>,
+    ConnectInfo(peer): ConnectInfo<SocketAddr>,
+    Form(form): Form<FtpForm>,
+) -> Result<Response, WebError> {
+    if !user.csrf_ok(&form.csrf) {
+        return Ok(forbidden());
+    }
+    let mut new = (*state.settings.current()).clone();
+    new.ftp.enabled = form.enabled.is_some();
+    new.ftp.bind = form.bind.trim().to_string();
+    new.ftp.banner = form.banner.trim().to_string();
+    match save(&state, &user, peer, new.clone(), "save_ftp", &["ftp"]).await? {
+        None => Ok(Redirect::to("/decoys?saved=ftp").into_response()),
+        Some(problem) => Ok(decoys_page(&state, &user, &new, "", Some(("ftp", problem)))?.into_response()),
     }
 }
 

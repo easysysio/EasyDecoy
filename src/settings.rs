@@ -27,6 +27,7 @@ pub struct Settings {
     pub limits: Limits,
     pub telnet: TelnetSettings,
     pub http: HttpSettings,
+    pub ftp: FtpSettings,
     pub recording: Recording,
     pub syslog: SyslogSettings,
 }
@@ -94,6 +95,23 @@ impl Default for HttpSettings {
             server_header: "nginx/1.24.0".to_string(),
             title: "Admin Console".to_string(),
         }
+    }
+}
+
+/// The FTP decoy: a server that never accepts a login.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct FtpSettings {
+    pub enabled: bool,
+    /// Address and port to listen on, as ip:port.
+    pub bind: String,
+    /// The greeting after "220 ", as a real server names itself.
+    pub banner: String,
+}
+
+impl Default for FtpSettings {
+    fn default() -> Self {
+        Self { enabled: true, bind: "0.0.0.0:2121".to_string(), banner: "(vsFTPd 3.0.5)".to_string() }
     }
 }
 
@@ -212,10 +230,12 @@ impl Settings {
 
         let telnet = bind_address("Telnet", &self.telnet.bind)?;
         let http = bind_address("HTTP", &self.http.bind)?;
+        let ftp = bind_address("FTP", &self.ftp.bind)?;
         text("Telnet banner", &self.telnet.banner, 0, 200)?;
         text("Telnet hostname", &self.telnet.hostname, 1, 64)?;
         text("HTTP Server header", &self.http.server_header, 0, 128)?;
         text("HTTP page title", &self.http.title, 1, 128)?;
+        text("FTP banner", &self.ftp.banner, 1, 200)?;
 
         let mut taken = vec![("the management GUI", gui)];
         if self.telnet.enabled {
@@ -223,6 +243,9 @@ impl Settings {
         }
         if self.http.enabled {
             taken.push(("the HTTP decoy", http));
+        }
+        if self.ftp.enabled {
+            taken.push(("the FTP decoy", ftp));
         }
         for (i, (a, x)) in taken.iter().enumerate() {
             for (b, y) in &taken[i + 1..] {
@@ -409,6 +432,8 @@ mod tests {
         assert!(check(|s| s.telnet.bind = "0.0.0.0:0".into()).is_err());
         assert!(check(|s| s.telnet.hostname = String::new()).is_err());
         assert!(check(|s| s.http.server_header = "nginx\r\nX-Evil: 1".into()).is_err());
+        assert!(check(|s| s.ftp.banner = String::new()).is_err());
+        assert!(check(|s| s.ftp.bind = "0.0.0.0:8080".into()).unwrap_err().contains("HTTP decoy already uses"));
         assert!(check(|s| s.limits.max_connections = 0).is_err());
         assert!(check(|s| {
             s.syslog.enabled = true;

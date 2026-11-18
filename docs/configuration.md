@@ -22,6 +22,9 @@ EasyDecoy keeps its settings in two places:
 | HTTP: Listen on | `0.0.0.0:8080` | Address and port. The packaged service starts on `0.0.0.0:80`. |
 | HTTP: Server header | `nginx/1.24.0` | Sent as the `Server` response header. Empty leaves it out. |
 | HTTP: Page title | `Admin Console` | Title and heading of the sign-in page. |
+| FTP: Enabled | on | Run the FTP decoy. An upgrade from 0.1.0 leaves it off. |
+| FTP: Listen on | `0.0.0.0:2121` | Address and port. The packaged service starts on `0.0.0.0:21`. |
+| FTP: Banner | `(vsFTPd 3.0.5)` | The greeting after `220`, as a real server names itself. |
 
 Saving a decoy restarts that decoy alone. Its listener is closed and opened
 again on the new address, and the sessions it had open end.
@@ -36,7 +39,7 @@ again on the new address, and the sessions it had open end.
 | Keep events for | `90` days | Older events are deleted from the database every hour. `0` keeps them forever. |
 | Also write events to | empty | A file every event is appended to, as a JSON line. Empty writes no file; `-` writes to stdout. See [Events](events.md#an-events-file). |
 
-Changing a limit restarts both decoys, since they share it.
+Changing a limit restarts every decoy, since they share it.
 
 ### Syslog
 

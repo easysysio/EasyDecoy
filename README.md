@@ -2,8 +2,8 @@
 
 HoneyPot for your network.
 
-EasyDecoy runs decoy network services: a Telnet login and a web admin panel
-that look real but lead nowhere. Nobody legitimate has a reason to connect to
+EasyDecoy runs decoy network services: a Telnet login, a web admin panel and
+an FTP server that look real but lead nowhere. Nobody legitimate has a reason to connect to
 them, so every connection is worth a look. Each one is recorded as a JSON
 event.
 
@@ -31,7 +31,7 @@ ssh -L 9443:127.0.0.1:9443 decoy-host
 ```
 
 then open <https://localhost:9443/> and create the admin account. The packaged
-service puts the decoys on the real ports (23 and 80). It runs as its own
+service puts the decoys on the real ports (23, 80 and 21). It runs as its own
 unprivileged `easydecoy` account, with only the capability to bind ports below
 1024. An upgrade keeps your settings and restarts a running service; an
 upgrade from 0.1.0 moves the settings in its config file into the database.
@@ -43,12 +43,13 @@ cargo run
 ```
 
 Open <https://127.0.0.1:9443/>, create the account, and knock from another
-terminal. The decoys listen on `0.0.0.0:2323` (Telnet) and `0.0.0.0:8080`
-(HTTP):
+terminal. The decoys listen on `0.0.0.0:2323` (Telnet), `0.0.0.0:8080`
+(HTTP) and `0.0.0.0:2121` (FTP):
 
 ```sh
 telnet localhost 2323
 curl -d 'username=admin&password=x' http://localhost:8080/login
+curl ftp://admin:x@localhost:2121/
 ```
 
 ## The GUI
@@ -57,8 +58,8 @@ curl -d 'username=admin&password=x' http://localhost:8080/login
   days, a timeline, the top sources, usernames and paths, and each decoy's state.
 - **Events**: every event, filtered by decoy, kind, source or text, and
   exported as JSON lines.
-- **Decoys**: ports, banner, hostname, Server header, page title. A save
-  restarts that decoy, with no service restart.
+- **Decoys**: Telnet, HTTP and FTP: ports, banners, hostname, Server header,
+  page title. A save restarts that decoy, with no service restart.
 - **Settings**: limits, retention, an optional events file, syslog.
 - **Account**: password, and an audit log of every sign-in and change.
 
@@ -80,6 +81,8 @@ One JSON object per line:
 | `http`   | `request`       | `method`, `path`, `host`, `user_agent`                |
 | `http`   | `login_attempt` | as `request`, plus `username`, `password_length`      |
 | `http`   | `non_http`      | `sample`: the start of what the client sent           |
+| `ftp`    | `login_attempt` | `username`, `password_length`                         |
+| `ftp`    | `command`       | `command`, `argument`: sent without a login           |
 
 ## Syslog
 

@@ -35,8 +35,9 @@ first account by getting there after you.
     they are stored, for `jq` or another tool.
 
 **Decoys**
-:   Each decoy's state and settings. A decoy that couldn't start, usually
-    because its port is in use, says **Not running** and why. EasyDecoy tries
+:   Each decoy's state and settings: Telnet, HTTP and FTP. A decoy that
+    couldn't start, usually because its port is in use, says **Not running**
+    and why. EasyDecoy tries
     it again every 30 seconds, or as soon as you save it.
 
 **Settings**

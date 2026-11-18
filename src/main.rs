@@ -215,11 +215,13 @@ async fn first_start(
             if std::env::var_os("STATE_DIRECTORY").is_some() {
                 defaults.telnet.bind = "0.0.0.0:23".to_string();
                 defaults.http.bind = "0.0.0.0:80".to_string();
+                defaults.ftp.bind = "0.0.0.0:21".to_string();
             }
             tracing::info!(
-                "first start: default settings (Telnet on {}, HTTP on {})",
+                "first start: default settings (Telnet on {}, HTTP on {}, FTP on {})",
                 defaults.telnet.bind,
-                defaults.http.bind
+                defaults.http.bind,
+                defaults.ftp.bind
             );
             defaults
         }

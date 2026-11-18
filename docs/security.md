@@ -25,7 +25,8 @@ the next intruder to find.
 | Open sessions, across all decoys | Concurrent sessions, default 256 |
 | Silence before a client is dropped | Idle timeout, default 30 s |
 | Longest session | Session limit, default 120 s |
-| Telnet line | 1024 bytes |
+| Telnet or FTP line | 1024 bytes |
+| FTP commands per connection | 50 |
 | HTTP request head / body | 8 KiB / 4 KiB |
 | Recorded text, per field | 16 to 512 characters |
 
