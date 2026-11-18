@@ -14,14 +14,39 @@ the password itself.
 
 ## Install
 
-Each [release](https://github.com/easysysio/EasyDecoy/releases) has `.deb` and
-`.rpm` packages for x86_64 and arm64.
+Packages for x86_64 and arm64 come from the signed EasySYS repository, so
+upgrades arrive with the rest of the host's updates.
+
+Debian / Ubuntu:
 
 ```sh
-sudo apt install ./easydecoy_<version>-1_amd64.deb     # Debian / Ubuntu
-sudo dnf install ./easydecoy-<version>-1.x86_64.rpm    # Fedora / RHEL
+curl -fsSL https://repo.easysys.io/easydecoy/stable/debian/key.gpg \
+  | sudo gpg --dearmor -o /usr/share/keyrings/easysys.gpg
+echo "deb [signed-by=/usr/share/keyrings/easysys.gpg] https://repo.easysys.io/easydecoy/stable/debian ./" \
+  | sudo tee /etc/apt/sources.list.d/easydecoy.list
+sudo apt update && sudo apt install easydecoy
 sudo systemctl enable --now easydecoy
 ```
+
+RHEL / Fedora:
+
+```sh
+sudo tee /etc/yum.repos.d/easydecoy.repo >/dev/null <<'EOF'
+[easydecoy]
+name=EasyDecoy
+baseurl=https://repo.easysys.io/easydecoy/stable/redhat
+enabled=1
+gpgcheck=1
+gpgkey=https://repo.easysys.io/easydecoy/stable/redhat/key.gpg
+EOF
+sudo dnf install easydecoy
+sudo systemctl enable --now easydecoy
+```
+
+openSUSE, and installing a downloaded package by hand, are in the
+[installation guide](https://easydecoy.easysys.io/install/). Each
+[release](https://github.com/easysysio/EasyDecoy/releases) also has the
+`.deb` and `.rpm` packages.
 
 The decoys and everything else are managed in a web GUI, which listens on the
 host itself only (`127.0.0.1:9443`). From your computer:

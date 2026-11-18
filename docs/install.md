@@ -1,11 +1,68 @@
 # Installation
 
 EasyDecoy ships as a single binary and installs a **service** that runs the
-decoys and the management GUI. Every
-[GitHub release](https://github.com/easysysio/EasyDecoy/releases) has `.deb`
-and `.rpm` packages for **x86_64** and **arm64**.
+decoys and the management GUI. It is packaged for the **Debian** and **Red
+Hat** families on **x86_64** and **arm64**. Install it from the EasySYS package
+repository, so upgrades arrive with the rest of the host's updates.
 
 Installing starts nothing. The decoys go live when you enable the service.
+
+## From the package repository
+
+=== "Debian / Ubuntu"
+
+    ```bash
+    # Add the EasySYS signing key and the EasyDecoy repository
+    curl -fsSL https://repo.easysys.io/easydecoy/stable/debian/key.gpg \
+      | sudo gpg --dearmor -o /usr/share/keyrings/easysys.gpg
+    echo "deb [signed-by=/usr/share/keyrings/easysys.gpg] https://repo.easysys.io/easydecoy/stable/debian ./" \
+      | sudo tee /etc/apt/sources.list.d/easydecoy.list
+
+    sudo apt update
+    sudo apt install easydecoy
+    ```
+
+=== "RHEL / Fedora"
+
+    ```bash
+    sudo tee /etc/yum.repos.d/easydecoy.repo >/dev/null <<'EOF'
+    [easydecoy]
+    name=EasyDecoy
+    baseurl=https://repo.easysys.io/easydecoy/stable/redhat
+    enabled=1
+    gpgcheck=1
+    gpgkey=https://repo.easysys.io/easydecoy/stable/redhat/key.gpg
+    EOF
+
+    sudo dnf install easydecoy
+    ```
+
+=== "openSUSE / SLES"
+
+    ```bash
+    sudo rpm --import https://repo.easysys.io/easydecoy/stable/redhat/key.gpg
+    sudo zypper addrepo -fg https://repo.easysys.io/easydecoy/stable/redhat easydecoy
+    sudo zypper install easydecoy
+    ```
+
+Then start it:
+
+```bash
+sudo systemctl enable --now easydecoy
+```
+
+Already using another EasySYS product, such as EasyLog? They are all signed
+with the same key, so `/usr/share/keyrings/easysys.gpg` is already there: add
+only the `easydecoy` repository.
+
+The repository and the packages are signed. apt checks the signed index, and
+dnf and zypper check each package and the repository metadata (`gpgcheck=1`).
+
+## A package by hand
+
+For a host without access to the repository, every
+[GitHub release](https://github.com/easysysio/EasyDecoy/releases) has the same
+`.deb` and `.rpm` packages:
 
 === "Debian / Ubuntu"
 
@@ -25,11 +82,9 @@ Installing starts nothing. The decoys go live when you enable the service.
     sudo zypper install ./easydecoy-<version>-1.x86_64.rpm # or .aarch64.rpm
     ```
 
-Then start it:
-
-```bash
-sudo systemctl enable --now easydecoy
-```
+Then start it with `sudo systemctl enable --now easydecoy`. A package installed
+by hand is upgraded by hand too: install the next release's package the same
+way.
 
 ## Open the GUI
 
@@ -83,8 +138,10 @@ the rest of its sandbox.
 
 ## Upgrades and removal
 
-- **An upgrade** keeps your config and database as they are, and restarts the
-  service if it was running. A service you stopped stays stopped.
+- **An upgrade** comes with the host's others (`sudo apt upgrade`,
+  `sudo dnf upgrade`, `sudo zypper update`). It keeps your config and
+  database as they are, and restarts the service if it was running. A
+  service you stopped stays stopped.
 - **Removing** the package stops and disables the service, so no decoy is left
   listening. `/etc/easydecoy`, `/var/lib/easydecoy` and `/var/log/easydecoy`
   stay behind.
@@ -95,12 +152,19 @@ the rest of its sandbox.
 that file, and on the first start of 0.2.0 its decoy, limit, syslog and
 events-file settings become the database's. Nothing changes for the decoys: they
 listen where they did, under the same names, and events still go to
-`/var/log/easydecoy/events.jsonl`. The FTP decoy, new in 0.2.0, starts off;
-turn it on from the **Decoys** page. So does the SSH decoy.
+`/var/log/easydecoy/events.jsonl`. The FTP decoy, new in 0.2.0, is set up on
+port 21 and starts off; turn it on from the **Decoys** page. So does the SSH
+decoy, on port 22.
 
 From then on the settings are changed in the GUI, and the old ones in the file
 are ignored. The log says so at each start until you delete them, leaving
 `log_level` and the [0.2.0 keys](configuration.md#the-config-file).
+
+### From 0.2.0
+
+0.2.1 adds the SSH decoy. On its first start it is set up on port 22 and left
+**off**, and the other decoys carry on as they were. Move the host's sshd
+before you turn it on: [Port 22](decoys.md#port-22) says how.
 
 ## From source
 

@@ -271,26 +271,46 @@ Login incorrect
 <label for="es-os-suse">openSUSE / SLES</label>
 <label for="es-os-air">From source</label>
 </div>
-<div class="es-panel es-panel--deb"><div class="es-term-body es-mono"><span class="t-c"># 1 — download from github.com/easysysio/EasyDecoy/releases</span>
-<span class="t-p">$</span> sudo apt install ./easydecoy_*_amd64.deb   <span class="t-c"># or _arm64.deb</span>
+<div class="es-panel es-panel--deb"><div class="es-term-body es-mono"><span class="t-c"># 1 — trust the repository</span>
+<span class="t-p">$</span> curl -fsSL https://repo.easysys.io/easydecoy/stable/debian/key.gpg \
+    | sudo gpg --dearmor -o /usr/share/keyrings/easysys.gpg
+<span class="t-p">$</span> echo "deb [signed-by=/usr/share/keyrings/easysys.gpg] \
+    https://repo.easysys.io/easydecoy/stable/debian ./" \
+    | sudo tee /etc/apt/sources.list.d/easydecoy.list
+<span class="t-c"># 2 — install and start</span>
+<span class="t-p">$</span> sudo apt update &amp;&amp; sudo apt install easydecoy
 <span class="t-p">$</span> sudo systemctl enable --now easydecoy
-<span class="t-c"># 2 — from your computer: tunnel to the GUI</span>
+<span class="t-c"># 3 — from your computer: tunnel to the GUI</span>
 <span class="t-p">$</span> ssh -L 9443:127.0.0.1:9443 decoy-host
-<span class="t-c"># 3 — open https://localhost:9443/, create the admin,</span>
+<span class="t-c"># 4 — open https://localhost:9443/, create the admin,</span>
 <span class="t-c">#     and make the decoys look like yours</span></div></div>
-<div class="es-panel es-panel--rpm"><div class="es-term-body es-mono"><span class="t-c"># 1 — download from github.com/easysysio/EasyDecoy/releases</span>
-<span class="t-p">$</span> sudo dnf install ./easydecoy-*.x86_64.rpm   <span class="t-c"># or .aarch64.rpm</span>
+<div class="es-panel es-panel--rpm"><div class="es-term-body es-mono"><span class="t-c"># 1 — trust the repository</span>
+<span class="t-p">$</span> sudo tee /etc/yum.repos.d/easydecoy.repo &gt;/dev/null &lt;&lt;'EOF'
+[easydecoy]
+name=EasyDecoy
+baseurl=https://repo.easysys.io/easydecoy/stable/redhat
+enabled=1
+gpgcheck=1
+gpgkey=https://repo.easysys.io/easydecoy/stable/redhat/key.gpg
+EOF
+<span class="t-c"># 2 — install and start</span>
+<span class="t-p">$</span> sudo dnf install easydecoy
 <span class="t-p">$</span> sudo systemctl enable --now easydecoy
-<span class="t-c"># 2 — from your computer: tunnel to the GUI</span>
+<span class="t-c"># 3 — from your computer: tunnel to the GUI</span>
 <span class="t-p">$</span> ssh -L 9443:127.0.0.1:9443 decoy-host
-<span class="t-c"># 3 — open https://localhost:9443/, create the admin,</span>
+<span class="t-c"># 4 — open https://localhost:9443/, create the admin,</span>
 <span class="t-c">#     and make the decoys look like yours</span></div></div>
-<div class="es-panel es-panel--suse"><div class="es-term-body es-mono"><span class="t-c"># 1 — download from github.com/easysysio/EasyDecoy/releases</span>
-<span class="t-p">$</span> sudo zypper install ./easydecoy-*.x86_64.rpm   <span class="t-c"># or .aarch64.rpm</span>
+<div class="es-panel es-panel--suse"><div class="es-term-body es-mono"><span class="t-c"># 1 — trust the repository</span>
+<span class="t-p">$</span> sudo rpm --import \
+    https://repo.easysys.io/easydecoy/stable/redhat/key.gpg
+<span class="t-p">$</span> sudo zypper addrepo -fg \
+    https://repo.easysys.io/easydecoy/stable/redhat easydecoy
+<span class="t-c"># 2 — install and start</span>
+<span class="t-p">$</span> sudo zypper install easydecoy
 <span class="t-p">$</span> sudo systemctl enable --now easydecoy
-<span class="t-c"># 2 — from your computer: tunnel to the GUI</span>
+<span class="t-c"># 3 — from your computer: tunnel to the GUI</span>
 <span class="t-p">$</span> ssh -L 9443:127.0.0.1:9443 decoy-host
-<span class="t-c"># 3 — open https://localhost:9443/, create the admin,</span>
+<span class="t-c"># 4 — open https://localhost:9443/, create the admin,</span>
 <span class="t-c">#     and make the decoys look like yours</span></div></div>
 <div class="es-panel es-panel--air"><div class="es-term-body es-mono"><span class="t-c"># 1 — build it (needs a Rust toolchain)</span>
 <span class="t-p">$</span> git clone https://github.com/easysysio/EasyDecoy
