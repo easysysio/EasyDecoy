@@ -58,6 +58,13 @@ bcrypt = "0.17"
 rand = "0.8"
 sha2 = "0.10"
 
+# Build-time code (proc macros, build scripts) is not stripped. On macOS 27.2,
+# `strip` leaves sqlx's macro library in a state dyld refuses to load
+# ("mis-aligned LINKEDIT string pool"), which breaks `cargo build --release`.
+# The easydecoy binary itself is still stripped as usual.
+[profile.release.build-override]
+strip = false
+
 [dev-dependencies]
 # Driving the GUI's router in tests without a socket.
 tower = { version = "0.5", features = ["util"] }
