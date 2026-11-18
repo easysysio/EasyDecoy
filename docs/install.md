@@ -1,11 +1,11 @@
 # Installation
 
 EasyDecoy ships as a single binary and installs a **service** that runs the
-decoys. Every [GitHub release](https://github.com/easysysio/EasyDecoy/releases)
-has `.deb` and `.rpm` packages for **x86_64** and **arm64**.
+decoys and the management GUI. Every
+[GitHub release](https://github.com/easysysio/EasyDecoy/releases) has `.deb`
+and `.rpm` packages for **x86_64** and **arm64**.
 
-Installing starts nothing. The decoys go live when you enable the service, so
-there is time to make them look like the rest of your network first.
+Installing starts nothing. The decoys go live when you enable the service.
 
 === "Debian / Ubuntu"
 
@@ -25,29 +25,52 @@ there is time to make them look like the rest of your network first.
     sudo zypper install ./easydecoy-<version>-1.x86_64.rpm # or .aarch64.rpm
     ```
 
-Then look over the config, and enable the service:
+Then start it:
 
 ```bash
-sudoedit /etc/easydecoy/easydecoy.toml
 sudo systemctl enable --now easydecoy
-sudo tail -f /var/log/easydecoy/events.jsonl
 ```
 
-!!! warning "The packaged config uses the real ports"
-    The Telnet decoy listens on **23** and the web decoy on **80**. If another
-    service on the host already uses one of them, EasyDecoy stops at startup and
-    `journalctl -u easydecoy` says which port. Move that decoy to another port,
-    or disable it, in the [configuration](configuration.md).
+## Open the GUI
+
+The GUI listens on **this machine only**, at `https://127.0.0.1:9443/`. A decoy
+host's other addresses are there for intruders to find, and the GUI must not
+be one of the things they find. Reach it from your computer through an SSH
+tunnel:
+
+```bash
+ssh -L 9443:127.0.0.1:9443 decoy-host
+```
+
+Then open **https://localhost:9443/**:
+
+1. Your browser warns about the certificate once. EasyDecoy made it on its
+   first start, self-signed. Accept it, or [use your own](configuration.md#the-guis-certificate).
+2. Create the administrator account. This page appears only while there are
+   no accounts.
+3. On **Decoys**, make them look like the rest of your network: the banner,
+   the hostname in the prompt, the web server's name and the sign-in page's
+   title. Each one restarts as you save it.
+
+The [GUI page](gui.md) walks through the rest.
+
+!!! note "The packaged service uses the real ports"
+    On its first start the service puts the Telnet decoy on **23** and the
+    web decoy on **80**. If another service on the host already uses one of
+    them, that decoy shows **Not running** in the GUI, with the reason, and
+    EasyDecoy tries it again every 30 seconds. Move it to another port on the
+    Decoys page, or turn it off.
 
 ## What the package installs
 
 | Path | What it is |
 |---|---|
-| `/usr/bin/easydecoy` | The binary |
-| `/etc/easydecoy/easydecoy.toml` | The config, written only if there is none |
+| `/usr/bin/easydecoy` | The binary. The GUI's pages are built in. |
+| `/etc/easydecoy/easydecoy.toml` | The config: the log level, and where the database and the GUI are. Written only if there is none. |
+| `/var/lib/easydecoy/easydecoy.db` | The database: settings, events, accounts, the audit trail. Made on the first start. |
 | `/usr/lib/systemd/system/easydecoy.service` | The systemd unit |
-| `/var/log/easydecoy/events.jsonl` | Events, created when the service first starts |
-| `/etc/logrotate.d/easydecoy` | Weekly rotation of the events file, twelve weeks kept |
+| `/var/log/easydecoy/` | For an [events file](events.md#an-events-file), if you set one |
+| `/etc/logrotate.d/easydecoy` | Weekly rotation of `/var/log/easydecoy/events.jsonl`, twelve weeks kept |
 
 The package also creates a system account, `easydecoy`, with no login shell.
 The service runs as that account, never as root. The only extra permission it
@@ -56,31 +79,44 @@ the rest of its sandbox.
 
 ## Upgrades and removal
 
-- **An upgrade** keeps your config as it is, and restarts the service if it was
-  running. A service you stopped stays stopped.
+- **An upgrade** keeps your config and database as they are, and restarts the
+  service if it was running. A service you stopped stays stopped.
 - **Removing** the package stops and disables the service, so no decoy is left
-  listening. The config in `/etc/easydecoy` and the events in
-  `/var/log/easydecoy` stay behind.
+  listening. `/etc/easydecoy`, `/var/lib/easydecoy` and `/var/log/easydecoy`
+  stay behind.
+
+### From 0.1.0
+
+0.1.0 kept every setting in `/etc/easydecoy/easydecoy.toml`. The upgrade keeps
+that file, and on the first start of 0.2.0 its decoy, limit, syslog and
+events-file settings become the database's. Nothing changes for the decoys: they
+listen where they did, under the same names, and events still go to
+`/var/log/easydecoy/events.jsonl`.
+
+From then on the settings are changed in the GUI, and the old ones in the file
+are ignored. The log says so at each start until you delete them, leaving
+`log_level` and the [0.2.0 keys](configuration.md#the-config-file).
 
 ## From source
 
 With a Rust toolchain, EasyDecoy runs straight from a checkout. It reads
-`config/easydecoy.toml`, which uses unprivileged ports (Telnet on 2323, web on
-8080) and writes events to stdout:
+`config/easydecoy.toml`, keeps its database in `easydecoy.db` beside it, and
+puts the decoys on unprivileged ports (Telnet on 2323, web on 8080):
 
 ```bash
 git clone https://github.com/easysysio/EasyDecoy
 cd EasyDecoy
-cargo run | jq .
+cargo run
 ```
 
-From another terminal:
+Open **https://127.0.0.1:9443/** and create the account. Then, from another
+terminal, knock:
 
 ```bash
 telnet localhost 2323
 curl -d 'username=admin&password=x' http://localhost:8080/login
 ```
 
-EasyDecoy's own log goes to stderr, so only events reach `jq`.
+The events are on the GUI's dashboard. EasyDecoy's own log goes to stderr.
 
-Next: [make the decoys look like yours](configuration.md).
+Next: [the GUI](gui.md).

@@ -20,7 +20,7 @@ use std::time::Duration;
 use anyhow::Result;
 
 use super::{Conn, Decoy};
-use crate::config::TelnetConfig;
+use crate::settings::TelnetSettings;
 use crate::event::clean;
 
 const MAX_ATTEMPTS: usize = 3;
@@ -46,7 +46,7 @@ pub struct Telnet {
 }
 
 impl Telnet {
-    pub fn new(config: &TelnetConfig) -> Self {
+    pub fn new(config: &TelnetSettings) -> Self {
         Self { banner: config.banner.clone(), hostname: config.hostname.clone() }
     }
 }

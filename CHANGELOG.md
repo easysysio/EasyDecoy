@@ -7,6 +7,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-11-08
+
+### Added
+
+- Management GUI over HTTPS: a dashboard (events, login attempts, sources, a
+  timeline, the top sources, usernames and paths), a filterable event list
+  with JSON-lines export, and pages for the decoys, limits, retention, syslog
+  and the account. It listens on `127.0.0.1:9443` by default, to be reached
+  through an SSH tunnel.
+- A SQLite database for settings, events, accounts and the audit trail.
+  Events are kept for 90 days by default.
+- Settings take effect as they are saved: a decoy restarts alone when its
+  settings change, and syslog and the events file switch over without a
+  restart.
+- A decoy that can't bind its port is shown as not running, with the reason,
+  and retried every 30 seconds, instead of stopping EasyDecoy.
+- First-run setup of the administrator, bcrypt passwords, 12-hour sessions,
+  CSRF tokens, a lockout after 5 failed sign-ins, and an audit log of every
+  sign-in and change.
+- A self-signed certificate for the GUI, made on the first start, or your own
+  through `gui_cert` and `gui_key`.
+- A warning on every page while the GUI listens on all addresses or on a
+  decoy's address, and no decoy may take the GUI's port.
+
+### Changed
+
+- The config file now holds only `log_level`, `db_path`, `gui_bind`,
+  `gui_cert` and `gui_key`. Everything else is set in the GUI.
+- Events go to the database. The events file is optional, and an empty path
+  now means no file; `-` means stdout.
+- Event times are always written to the microsecond.
+- `chrono` (unmaintained, RUSTSEC-2026-0543) is replaced by `time`, and the
+  database layer is sqlx 0.9 with SQLite from libsqlite3-sys 0.40
+  (RUSTSEC-2026-0459). `cargo audit` reports nothing.
+
+### Upgrading from 0.1.0
+
+The package keeps `/etc/easydecoy/easydecoy.toml`. On the first start of
+0.2.0, its decoy, limit, syslog and events-file settings are imported into the
+database, so the decoys keep their ports and names and events still reach
+`/var/log/easydecoy/events.jsonl`. After that they are changed in the GUI; the
+old keys in the file are ignored, and the log says so until they are removed.
+
 ## [0.1.0] — 2026-11-07
 
 ### Added

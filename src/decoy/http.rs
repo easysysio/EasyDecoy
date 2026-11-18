@@ -18,7 +18,7 @@ use std::time::Duration;
 use anyhow::Result;
 
 use super::{Conn, Decoy};
-use crate::config::HttpConfig;
+use crate::settings::HttpSettings;
 use crate::event::clean;
 
 const MAX_HEAD: usize = 8 * 1024;
@@ -41,7 +41,7 @@ pub struct Http {
 }
 
 impl Http {
-    pub fn new(config: &HttpConfig) -> Self {
+    pub fn new(config: &HttpSettings) -> Self {
         // clean() keeps a CR or LF in the config from breaking the header block.
         Self { server: clean(&config.server_header, 128), title: escape_html(&config.title) }
     }
@@ -279,7 +279,7 @@ mod tests {
 
     #[test]
     fn the_title_cannot_inject_markup() {
-        let config = HttpConfig { title: "<script>".into(), ..HttpConfig::default() };
+        let config = HttpSettings { title: "<script>".into(), ..HttpSettings::default() };
         assert!(!Http::new(&config).login_page(false).contains("<script>"));
     }
 }

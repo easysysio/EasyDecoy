@@ -25,12 +25,13 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 
-use chrono::{DateTime, SecondsFormat, Utc};
+use time::OffsetDateTime;
+use time::macros::format_description;
 use tokio::io::AsyncWriteExt;
 use tokio::net::{TcpStream, UdpSocket, lookup_host};
 use tokio::sync::mpsc;
 
-use crate::config::{SyslogConfig, SyslogFormat, SyslogProtocol};
+use crate::settings::{SyslogFormat, SyslogProtocol, SyslogSettings};
 
 // Messages waiting to be sent before new ones are dropped.
 const QUEUE: usize = 1024;
@@ -59,7 +60,7 @@ impl Severity {
 
 /// One event, waiting to be sent.
 struct Message {
-    time: DateTime<Utc>,
+    time: OffsetDateTime,
     kind: &'static str,
     text: String,
 }
@@ -71,7 +72,7 @@ pub struct SyslogTx {
 }
 
 impl SyslogTx {
-    pub fn send(&self, time: DateTime<Utc>, kind: &'static str, text: &str) {
+    pub fn send(&self, time: OffsetDateTime, kind: &'static str, text: &str) {
         let message = Message { time, kind, text: text.to_string() };
         if self.tx.try_send(message).is_err() {
             self.lost.fetch_add(1, Ordering::Relaxed);
@@ -85,7 +86,7 @@ impl SyslogTx {
 // is connected yet: a collector that is down at startup is reported when the
 // first event cannot reach it, and EasyDecoy runs regardless.
 // ─────────────────────────────────────────────────────────────────────────────
-pub fn spawn(config: &SyslogConfig) -> SyslogTx {
+pub fn spawn(config: &SyslogSettings) -> SyslogTx {
     let (tx, rx) = mpsc::channel(QUEUE);
     let lost = Arc::new(AtomicU64::new(0));
     let hostname = match config.hostname.trim() {
@@ -105,7 +106,7 @@ pub fn spawn(config: &SyslogConfig) -> SyslogTx {
 }
 
 struct Sender {
-    config: SyslogConfig,
+    config: SyslogSettings,
     hostname: String,
     udp: Option<UdpSocket>,
     tcp: Option<TcpStream>,
@@ -168,12 +169,18 @@ impl Sender {
         let text = &message.text;
         let mut line = match self.config.format {
             SyslogFormat::Rfc5424 => {
-                let time = message.time.to_rfc3339_opts(SecondsFormat::Millis, true);
+                let format = format_description!(
+                    "[year]-[month]-[day]T[hour]:[minute]:[second].[subsecond digits:3]Z"
+                );
+                let time = message.time.to_offset(time::UtcOffset::UTC).format(format).unwrap_or_default();
                 format!("<{pri}>1 {time} {host} {APP} - {} - {text}", message.kind)
             }
             SyslogFormat::Rfc3164 => {
                 // RFC 3164 has no time zone; this is UTC, like EasyWAF's.
-                let time = message.time.format("%b %e %H:%M:%S");
+                let format = format_description!(
+                    "[month repr:short] [day padding:space] [hour]:[minute]:[second]"
+                );
+                let time = message.time.to_offset(time::UtcOffset::UTC).format(format).unwrap_or_default();
                 format!("<{pri}>{time} {host} {APP}: {text}")
             }
         };
@@ -245,7 +252,7 @@ async fn resolve(server: &str) -> io::Result<SocketAddr> {
 
 /// This machine's name, as the collector should see it: the sensor that saw
 /// the event, not the name a decoy pretends to have.
-fn system_hostname() -> String {
+pub fn system_hostname() -> String {
     ["/proc/sys/kernel/hostname", "/etc/hostname"]
         .iter()
         .find_map(|path| std::fs::read_to_string(path).ok())
@@ -263,17 +270,17 @@ fn header_field(text: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::Facility;
+    use crate::settings::Facility;
     use tokio::io::{AsyncBufReadExt, BufReader};
     use tokio::net::TcpListener;
 
-    fn sender(config: SyslogConfig) -> Sender {
+    fn sender(config: SyslogSettings) -> Sender {
         Sender { config, hostname: "sensor1".into(), udp: None, tcp: None, next_connect: None, failing: false }
     }
 
     fn message() -> Message {
         Message {
-            time: "2026-11-07T11:20:40.409920Z".parse().unwrap(),
+            time: time::macros::datetime!(2026-11-07 11:20:40.409920 UTC),
             kind: "login_attempt",
             text: r#"{"decoy":"telnet"}"#.into(),
         }
@@ -281,7 +288,7 @@ mod tests {
 
     #[test]
     fn frames_rfc5424_with_the_kind_as_message_id() {
-        let frame = sender(SyslogConfig::default()).frame(&message());
+        let frame = sender(SyslogSettings::default()).frame(&message());
         // local0 (16) * 8 + warning (4) = 132
         assert_eq!(
             String::from_utf8(frame).unwrap(),
@@ -291,11 +298,11 @@ mod tests {
 
     #[test]
     fn frames_rfc3164_newline_terminated_over_tcp() {
-        let config = SyslogConfig {
+        let config = SyslogSettings {
             format: SyslogFormat::Rfc3164,
             protocol: SyslogProtocol::Tcp,
             facility: Facility::Auth,
-            ..SyslogConfig::default()
+            ..SyslogSettings::default()
         };
         let mut message = message();
         message.kind = "connect";
@@ -314,9 +321,9 @@ mod tests {
     #[tokio::test]
     async fn delivers_over_udp() {
         let collector = UdpSocket::bind("127.0.0.1:0").await.unwrap();
-        let config = SyslogConfig { server: collector.local_addr().unwrap().to_string(), ..SyslogConfig::default() };
+        let config = SyslogSettings { server: collector.local_addr().unwrap().to_string(), ..SyslogSettings::default() };
         let tx = spawn(&config);
-        tx.send(Utc::now(), "connect", "{}");
+        tx.send(OffsetDateTime::now_utc(), "connect", "{}");
 
         let mut buf = [0u8; 512];
         let n = tokio::time::timeout(Duration::from_secs(2), collector.recv(&mut buf)).await.unwrap().unwrap();
@@ -328,14 +335,14 @@ mod tests {
     #[tokio::test]
     async fn delivers_over_tcp_one_line_per_event() {
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-        let config = SyslogConfig {
+        let config = SyslogSettings {
             server: listener.local_addr().unwrap().to_string(),
             protocol: SyslogProtocol::Tcp,
-            ..SyslogConfig::default()
+            ..SyslogSettings::default()
         };
         let tx = spawn(&config);
-        tx.send(Utc::now(), "connect", "{\"n\":1}");
-        tx.send(Utc::now(), "login_attempt", "{\"n\":2}");
+        tx.send(OffsetDateTime::now_utc(), "connect", "{\"n\":1}");
+        tx.send(OffsetDateTime::now_utc(), "login_attempt", "{\"n\":2}");
 
         let (stream, _) = listener.accept().await.unwrap();
         let mut lines = BufReader::new(stream).lines();

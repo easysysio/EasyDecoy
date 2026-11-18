@@ -1,176 +1,70 @@
 // =============================================================================
-// config.rs — EasyDecoy runtime configuration
+// config.rs — what EasyDecoy needs before the GUI exists
 //
-// Loads settings from a TOML file (default: config/easydecoy.toml): where
-// events go, the limits every decoy runs under, and one section per decoy.
-// Every field has a default, so a partial or missing config still yields a
-// running honeypot. Unknown keys are an error, so a typo can't silently leave
-// a decoy at its defaults.
+// The config file holds only what has to be known before the database is open
+// and the GUI is listening: the log level, where the database is, and where
+// the GUI listens. Everything else is set in the GUI and kept in the database
+// (see src/settings.rs).
+//
+// 0.1.0 kept every setting in this file. Those keys are still read, once: on
+// the first start with an empty database they become its settings (`legacy`),
+// and after that they are reported as ignored. Unknown keys are an error, so a
+// typo can't silently leave something at its default.
 // =============================================================================
+
+use std::net::SocketAddr;
+use std::path::Path;
 
 use anyhow::{Context, Result};
 use serde::Deserialize;
-use std::path::Path;
 
-/// Top-level configuration loaded from TOML.
+use crate::settings::{HttpSettings, Settings, SyslogSettings, TelnetSettings};
+
+/// The GUI's default address: this machine only, reached over an SSH tunnel.
+/// A decoy host's other addresses are for intruders to find; the GUI must not
+/// be one of the things they find.
+pub const DEFAULT_GUI_BIND: &str = "127.0.0.1:9443";
+
 #[derive(Debug, Clone, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct Config {
     /// Verbosity when RUST_LOG isn't set: error, warn, info, debug or trace.
     pub log_level: String,
-    /// File events are appended to as JSON lines. Empty writes them to stdout.
-    pub events_file: String,
-    /// Concurrent client sessions across all decoys; more are closed at once.
-    pub max_connections: usize,
-    /// A client that sends nothing for this long is disconnected.
-    pub idle_timeout_secs: u64,
-    /// No session lasts longer than this, however active the client.
-    pub session_limit_secs: u64,
-    pub telnet: TelnetConfig,
-    pub http: HttpConfig,
-    pub syslog: SyslogConfig,
+    /// The SQLite database. Empty puts it in systemd's state directory
+    /// (/var/lib/easydecoy) when run as the service, or easydecoy.db here.
+    pub db_path: String,
+    /// Where the management GUI listens, as ip:port. Always HTTPS.
+    pub gui_bind: String,
+    /// A certificate and key (PEM files) for the GUI. Both empty uses a
+    /// self-signed certificate made on the first start.
+    pub gui_cert: String,
+    pub gui_key: String,
+
+    // ── 0.1.0 settings: imported into an empty database, then ignored ──────
+    pub events_file: Option<String>,
+    pub max_connections: Option<usize>,
+    pub idle_timeout_secs: Option<u64>,
+    pub session_limit_secs: Option<u64>,
+    pub telnet: Option<TelnetSettings>,
+    pub http: Option<HttpSettings>,
+    pub syslog: Option<SyslogSettings>,
 }
 
 impl Default for Config {
     fn default() -> Self {
         Self {
             log_level: "info".to_string(),
-            events_file: String::new(),
-            max_connections: 256,
-            idle_timeout_secs: 30,
-            session_limit_secs: 120,
-            telnet: TelnetConfig::default(),
-            http: HttpConfig::default(),
-            syslog: SyslogConfig::default(),
-        }
-    }
-}
-
-/// The Telnet decoy: a login prompt that never accepts a login.
-#[derive(Debug, Clone, Deserialize)]
-#[serde(default, deny_unknown_fields)]
-pub struct TelnetConfig {
-    pub enabled: bool,
-    /// Address and port to listen on.
-    pub bind: String,
-    /// Printed when a client connects, as a real host prints /etc/issue.net.
-    pub banner: String,
-    /// Shown in the prompt: "<hostname> login:".
-    pub hostname: String,
-}
-
-impl Default for TelnetConfig {
-    fn default() -> Self {
-        Self {
-            enabled: true,
-            bind: "0.0.0.0:2323".to_string(),
-            banner: "Ubuntu 22.04.4 LTS".to_string(),
-            hostname: "fileserver01".to_string(),
-        }
-    }
-}
-
-/// The HTTP decoy: a web administration sign-in page.
-#[derive(Debug, Clone, Deserialize)]
-#[serde(default, deny_unknown_fields)]
-pub struct HttpConfig {
-    pub enabled: bool,
-    /// Address and port to listen on.
-    pub bind: String,
-    /// Sent as the Server response header. Empty leaves the header out.
-    pub server_header: String,
-    /// Title and heading of the sign-in page.
-    pub title: String,
-}
-
-impl Default for HttpConfig {
-    fn default() -> Self {
-        Self {
-            enabled: true,
-            bind: "0.0.0.0:8080".to_string(),
-            server_header: "nginx/1.24.0".to_string(),
-            title: "Admin Console".to_string(),
-        }
-    }
-}
-
-/// Sending every event to a syslog collector as well (see src/syslog.rs).
-#[derive(Debug, Clone, Deserialize)]
-#[serde(default, deny_unknown_fields)]
-pub struct SyslogConfig {
-    pub enabled: bool,
-    /// The collector, as host:port. A name is resolved again for each message.
-    pub server: String,
-    pub protocol: SyslogProtocol,
-    pub format: SyslogFormat,
-    pub facility: Facility,
-    /// The HOSTNAME field. Empty uses this machine's name.
-    pub hostname: String,
-}
-
-impl Default for SyslogConfig {
-    fn default() -> Self {
-        Self {
-            enabled: false,
-            server: "127.0.0.1:514".to_string(),
-            protocol: SyslogProtocol::Udp,
-            format: SyslogFormat::Rfc5424,
-            facility: Facility::Local0,
-            hostname: String::new(),
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum SyslogProtocol {
-    Udp,
-    Tcp,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum SyslogFormat {
-    /// Full UTC timestamp with milliseconds, and the event kind as MSGID.
-    Rfc5424,
-    /// The older BSD format, for collectors that read nothing else.
-    Rfc3164,
-}
-
-/// The syslog facilities it makes sense to file decoy events under.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum Facility {
-    User,
-    Daemon,
-    Auth,
-    Authpriv,
-    Local0,
-    Local1,
-    Local2,
-    Local3,
-    Local4,
-    Local5,
-    Local6,
-    Local7,
-}
-
-impl Facility {
-    /// The facility's number (RFC 5424 §6.2.1).
-    pub fn code(self) -> u8 {
-        match self {
-            Self::User => 1,
-            Self::Daemon => 3,
-            Self::Auth => 4,
-            Self::Authpriv => 10,
-            Self::Local0 => 16,
-            Self::Local1 => 17,
-            Self::Local2 => 18,
-            Self::Local3 => 19,
-            Self::Local4 => 20,
-            Self::Local5 => 21,
-            Self::Local6 => 22,
-            Self::Local7 => 23,
+            db_path: String::new(),
+            gui_bind: DEFAULT_GUI_BIND.to_string(),
+            gui_cert: String::new(),
+            gui_key: String::new(),
+            events_file: None,
+            max_connections: None,
+            idle_timeout_secs: None,
+            session_limit_secs: None,
+            telnet: None,
+            http: None,
+            syslog: None,
         }
     }
 }
@@ -189,72 +83,136 @@ impl Config {
         }
         let text = std::fs::read_to_string(path).with_context(|| format!("reading {path}"))?;
         let config: Self = toml::from_str(&text).with_context(|| format!("parsing {path}"))?;
-        config.check().with_context(|| format!("checking {path}"))?;
+        config.gui_addr().with_context(|| format!("checking {path}"))?;
+        if config.gui_cert.trim().is_empty() != config.gui_key.trim().is_empty() {
+            anyhow::bail!("{path}: gui_cert and gui_key go together; set both or neither");
+        }
         Ok((config, true))
     }
 
-    /// What parsing alone cannot catch.
-    fn check(&self) -> Result<()> {
-        if self.syslog.enabled {
-            // A missing port would otherwise surface only as a failed send,
-            // when the first event arrives.
-            let port = self.syslog.server.rsplit_once(':').and_then(|(_, p)| p.parse::<u16>().ok());
-            if port.is_none_or(|p| p == 0) {
-                anyhow::bail!("syslog server {:?} must be host:port, e.g. 10.0.0.5:514", self.syslog.server);
-            }
+    pub fn gui_addr(&self) -> Result<SocketAddr> {
+        crate::settings::bind_address("gui_bind", &self.gui_bind).map_err(anyhow::Error::msg)
+    }
+
+    /// Where the database is: `db_path`, or the default for how EasyDecoy runs.
+    pub fn db_file(&self) -> String {
+        if !self.db_path.trim().is_empty() {
+            return self.db_path.trim().to_string();
         }
-        Ok(())
+        // systemd sets STATE_DIRECTORY for a unit with StateDirectory=.
+        match std::env::var("STATE_DIRECTORY") {
+            Ok(dir) if !dir.is_empty() => format!("{dir}/easydecoy.db"),
+            _ => "easydecoy.db".to_string(),
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // legacy()
+    // The 0.1.0 settings this file still carries, as Settings, or None when
+    // it has none. Keys the file leaves out keep the current defaults.
+    // ─────────────────────────────────────────────────────────────────────────
+    pub fn legacy(&self) -> Option<Settings> {
+        let any = self.events_file.is_some()
+            || self.max_connections.is_some()
+            || self.idle_timeout_secs.is_some()
+            || self.session_limit_secs.is_some()
+            || self.telnet.is_some()
+            || self.http.is_some()
+            || self.syslog.is_some();
+        if !any {
+            return None;
+        }
+        let mut s = Settings::default();
+        if let Some(v) = &self.events_file {
+            // 0.1.0 wrote to stdout when events_file was empty; 0.2.0 spells
+            // that "-", and empty means the database alone.
+            s.recording.events_file = match v.trim() {
+                "" => "-".to_string(),
+                path => path.to_string(),
+            };
+        }
+        if let Some(v) = self.max_connections {
+            s.limits.max_connections = v;
+        }
+        if let Some(v) = self.idle_timeout_secs {
+            s.limits.idle_timeout_secs = v;
+        }
+        if let Some(v) = self.session_limit_secs {
+            s.limits.session_limit_secs = v;
+        }
+        if let Some(v) = &self.telnet {
+            s.telnet = v.clone();
+        }
+        if let Some(v) = &self.http {
+            s.http = v.clone();
+        }
+        if let Some(v) = &self.syslog {
+            s.syslog = v.clone();
+        }
+        Some(s)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn a_partial_config_keeps_the_other_defaults() {
-        let config: Config = toml::from_str("[http]\nenabled = false\n").unwrap();
-        assert!(!config.http.enabled);
-        assert!(config.telnet.enabled);
-        assert_eq!(config.http.bind, "0.0.0.0:8080");
-    }
+    use crate::settings::SyslogProtocol;
 
     #[test]
     fn a_misspelled_key_is_an_error() {
-        assert!(toml::from_str::<Config>("[telnet]\nenabeld = false\n").is_err());
+        assert!(toml::from_str::<Config>("gui_bnd = \"127.0.0.1:9443\"\n").is_err());
     }
 
     #[test]
-    fn reads_the_syslog_choices() {
-        let config: Config =
-            toml::from_str("[syslog]\nenabled = true\nprotocol = \"tcp\"\nfacility = \"auth\"\n").unwrap();
-        assert_eq!(config.syslog.protocol, SyslogProtocol::Tcp);
-        assert_eq!(config.syslog.facility.code(), 4);
-        assert_eq!(config.syslog.format, SyslogFormat::Rfc5424);
-        assert!(toml::from_str::<Config>("[syslog]\nprotocol = \"tls\"\n").is_err());
-        assert!(toml::from_str::<Config>("[syslog]\nfacility = \"kern\"\n").is_err());
-    }
-
-    #[test]
-    fn the_shipped_configs_are_valid() {
+    fn the_shipped_configs_are_valid_and_carry_no_old_settings() {
         for text in [include_str!("../config/easydecoy.toml"), include_str!("../packaging/easydecoy.toml")] {
             let config: Config = toml::from_str(text).unwrap();
-            config.check().unwrap();
+            config.gui_addr().unwrap();
+            assert!(config.legacy().is_none());
         }
     }
 
     #[test]
-    fn a_syslog_server_needs_a_port() {
-        let check = |server: &str| {
-            let mut config = Config::default();
-            config.syslog.enabled = true;
-            config.syslog.server = server.to_string();
-            config.check()
-        };
-        assert!(check("10.0.0.5:514").is_ok());
-        assert!(check("[fd00::5]:514").is_ok());
-        assert!(check("logs.example.com:6514").is_ok());
-        assert!(check("10.0.0.5").is_err());
-        assert!(check("10.0.0.5:0").is_err());
+    fn a_0_1_0_config_becomes_the_first_settings() {
+        // The config 0.1.0's package installed, as an administrator edited it.
+        let text = r#"
+log_level = "info"
+events_file = "/var/log/easydecoy/events.jsonl"
+max_connections = 64
+
+[telnet]
+enabled  = true
+bind     = "0.0.0.0:23"
+hostname = "fs-ams-03"
+
+[http]
+enabled = false
+
+[syslog]
+enabled  = true
+server   = "10.0.0.5:514"
+protocol = "tcp"
+"#;
+        let config: Config = toml::from_str(text).unwrap();
+        let s = config.legacy().unwrap();
+        assert_eq!(s.recording.events_file, "/var/log/easydecoy/events.jsonl");
+        assert_eq!(s.limits.max_connections, 64);
+        assert_eq!(s.limits.idle_timeout_secs, 30);
+        assert_eq!(s.telnet.bind, "0.0.0.0:23");
+        assert_eq!(s.telnet.hostname, "fs-ams-03");
+        assert_eq!(s.telnet.banner, "Ubuntu 22.04.4 LTS");
+        assert!(!s.http.enabled);
+        assert_eq!(s.syslog.protocol, SyslogProtocol::Tcp);
+        // An empty events_file was stdout in 0.1.0, and stays stdout.
+        let stdout: Config = toml::from_str("events_file = \"\"\n").unwrap();
+        assert_eq!(stdout.legacy().unwrap().recording.events_file, "-");
+        // GUI settings were not in 0.1.0, so they take their defaults.
+        assert_eq!(config.gui_bind, DEFAULT_GUI_BIND);
+    }
+
+    #[test]
+    fn the_database_goes_where_systemd_says_state_belongs() {
+        let config = Config { db_path: "/data/decoy.db".into(), ..Config::default() };
+        assert_eq!(config.db_file(), "/data/decoy.db");
     }
 }

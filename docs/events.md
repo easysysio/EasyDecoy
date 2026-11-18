@@ -1,22 +1,27 @@
 # Events
 
-Everything that happens to a decoy is recorded as an **event**: one JSON
-object per line, appended to `events_file`. The package writes them to
-`/var/log/easydecoy/events.jsonl`. With `events_file` empty they go to stdout,
-and EasyDecoy's own log goes to stderr, so stdout carries nothing but events.
+Everything that happens to a decoy is recorded as an **event**: a JSON object
+like this one.
 
 ```json
 {"time":"2026-11-07T11:20:40.409920Z","decoy":"telnet","kind":"login_attempt","src_ip":"10.0.4.17","src_port":61364,"dst_port":23,"username":"admin","password_length":8}
 ```
 
-Each event is flushed as it is written, so `tail -f` sees it at once and a
-crash loses nothing that was already recorded.
+Every event is stored in the **database**, which is what the GUI's
+[dashboard and events page](gui.md#the-pages) show, and what **Export**
+downloads, one JSON object per line. Events are kept for 90 days by default
+(**Settings → Keep events for**).
+
+Each event can also go, as the same JSON line, to:
+
+- an [events file](#an-events-file), for tools that tail one;
+- a syslog collector, over [syslog](syslog.md).
 
 ## Fields in every event
 
 | Field | What it is |
 |---|---|
-| `time` | When it happened, UTC, RFC 3339 |
+| `time` | When it happened: UTC, RFC 3339, always to the microsecond |
 | `decoy` | `telnet` or `http` |
 | `kind` | What happened; see below |
 | `src_ip` | The client's address. An IPv4 client of a dual-stack listener is shown as plain IPv4. |
@@ -54,38 +59,58 @@ it is written:
 
 ## Reading events with jq
 
+An export from the GUI, or the events file, is one JSON object per line.
+
 Only the login attempts:
 
 ```bash
-jq -c 'select(.kind == "login_attempt")' /var/log/easydecoy/events.jsonl
+jq -c 'select(.kind == "login_attempt")' easydecoy-events.jsonl
 ```
 
 Who knocks most:
 
 ```bash
-jq -r .src_ip /var/log/easydecoy/events.jsonl | sort | uniq -c | sort -rn
+jq -r .src_ip easydecoy-events.jsonl | sort | uniq -c | sort -rn
 ```
 
 Which usernames are being tried:
 
 ```bash
-jq -r 'select(.username) | .username' /var/log/easydecoy/events.jsonl \
+jq -r 'select(.username) | .username' easydecoy-events.jsonl \
   | sort | uniq -c | sort -rn
 ```
 
 What scanners asked the web decoy for:
 
 ```bash
-jq -r 'select(.kind == "request") | .path' /var/log/easydecoy/events.jsonl \
+jq -r 'select(.kind == "request") | .path' easydecoy-events.jsonl \
   | sort | uniq -c | sort -rn | head
 ```
 
-## Rotation
+## An events file
 
-The package installs `/etc/logrotate.d/easydecoy`, which rotates the events
-file **weekly** and keeps **twelve** compressed weeks. It uses `copytruncate`:
-EasyDecoy keeps the file open in append mode, so after the copy it carries on
-writing at the start of the emptied file, with no restart needed.
+Set **Settings → Also write events to** to a path, and every event is appended
+to that file as well, as it is stored. Under the packaged service, use
+`/var/log/easydecoy/events.jsonl`: the service can write there, and the
+package rotates it.
 
-To keep events somewhere else as well, send them to a collector over
-[syslog](syslog.md).
+```bash
+sudo tail -f /var/log/easydecoy/events.jsonl
+```
+
+`-` writes the events to stdout instead, with EasyDecoy's own log on stderr,
+so stdout carries nothing but events:
+
+```bash
+cargo run | jq .
+```
+
+Lines are flushed as they are written, so `tail -f` sees them at once.
+
+### Rotation
+
+The package installs `/etc/logrotate.d/easydecoy`, which rotates
+`/var/log/easydecoy/events.jsonl` **weekly** and keeps **twelve** compressed
+weeks. It uses `copytruncate`: EasyDecoy keeps the file open in append mode,
+so after the copy it carries on writing at the start of the emptied file, with
+no restart needed. Retention in the database is separate, and set in the GUI.

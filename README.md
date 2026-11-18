@@ -20,35 +20,50 @@ Each [release](https://github.com/easysysio/EasyDecoy/releases) has `.deb` and
 ```sh
 sudo apt install ./easydecoy_<version>-1_amd64.deb     # Debian / Ubuntu
 sudo dnf install ./easydecoy-<version>-1.x86_64.rpm    # Fedora / RHEL
+sudo systemctl enable --now easydecoy
 ```
 
-The package installs a systemd unit but does not start it. Look over
-`/etc/easydecoy/easydecoy.toml` first: the packaged config uses the real ports
-(23 and 80). Then:
+The decoys and everything else are managed in a web GUI, which listens on the
+host itself only (`127.0.0.1:9443`). From your computer:
 
 ```sh
-sudo systemctl enable --now easydecoy
-sudo tail -f /var/log/easydecoy/events.jsonl
+ssh -L 9443:127.0.0.1:9443 decoy-host
 ```
 
-The service runs as its own unprivileged `easydecoy` account, with only the
-capability to bind ports below 1024. An upgrade keeps your config and restarts
-a running service.
+then open <https://localhost:9443/> and create the admin account. The packaged
+service puts the decoys on the real ports (23 and 80). It runs as its own
+unprivileged `easydecoy` account, with only the capability to bind ports below
+1024. An upgrade keeps your settings and restarts a running service; an
+upgrade from 0.1.0 moves the settings in its config file into the database.
 
 ## Quick start (from source)
 
 ```sh
-cargo run | jq .
+cargo run
 ```
 
-With the default config this listens on `0.0.0.0:2323` (Telnet) and
-`0.0.0.0:8080` (HTTP), and writes events to stdout. EasyDecoy's own log goes
-to stderr.
+Open <https://127.0.0.1:9443/>, create the account, and knock from another
+terminal. The decoys listen on `0.0.0.0:2323` (Telnet) and `0.0.0.0:8080`
+(HTTP):
 
 ```sh
 telnet localhost 2323
 curl -d 'username=admin&password=x' http://localhost:8080/login
 ```
+
+## The GUI
+
+- **Dashboard**: events, login attempts and sources over 24 hours, 7 or 30
+  days, a timeline, the top sources, usernames and paths, and each decoy's state.
+- **Events**: every event, filtered by decoy, kind, source or text, and
+  exported as JSON lines.
+- **Decoys**: ports, banner, hostname, Server header, page title. A save
+  restarts that decoy, with no service restart.
+- **Settings**: limits, retention, an optional events file, syslog.
+- **Account**: password, and an audit log of every sign-in and change.
+
+Everything is kept in one SQLite database (`/var/lib/easydecoy/easydecoy.db`
+under the service).
 
 ## Events
 
@@ -68,15 +83,9 @@ One JSON object per line:
 
 ## Syslog
 
-To send every event to a collector such as EasyLog as well, enable the
-`[syslog]` section:
-
-```toml
-[syslog]
-enabled  = true
-server   = "10.0.0.5:514"
-protocol = "udp"        # or "tcp"
-```
+To send every event to a collector such as EasyLog as well, turn on syslog
+under **Settings** in the GUI: the collector's `host:port`, UDP or TCP, RFC 5424
+or RFC 3164.
 
 Each event becomes one syslog message whose text is its JSON line. Login
 attempts go at severity *warning*, everything else at *notice*. In the
@@ -86,16 +95,18 @@ default RFC 5424 format, the event's kind is also the message ID:
 <132>1 2026-11-07T11:20:40.409Z sensor1 easydecoy - login_attempt - {"time":…}
 ```
 
-Events are always written locally first. A collector that is down costs only
-the messages sent while it was down; EasyDecoy reports that in its own log and
+Events are always stored locally. A collector that is down costs only the
+messages sent while it was down; EasyDecoy reports that in its own log and
 carries on.
 
 ## Configuration
 
-Settings live in a TOML file read from `EASYDECOY_CONFIG` (default:
-`config/easydecoy.toml`). Every setting has a default, and a misspelled key is
-an error. See [config/easydecoy.toml](config/easydecoy.toml) for what each one
-does.
+A small TOML file, read from `EASYDECOY_CONFIG` (default:
+`config/easydecoy.toml`), holds what is needed before the GUI exists: the log
+level, the database path, and the GUI's address and certificate. See
+[config/easydecoy.toml](config/easydecoy.toml). Everything else is in the GUI.
+
+Documentation: <https://easydecoy.easysys.io>
 
 ## License
 

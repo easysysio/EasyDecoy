@@ -67,8 +67,8 @@ close`). The request head may be at most **8 KiB** and the body at most
 A decoy only works if an intruder believes it.
 
 - **Name it like your real machines.** If your file servers are called
-  `fs-ams-02`, a `fileserver01` stands out. Set `hostname`, `banner`,
-  `server_header` and `title` to fit in.
+  `fs-ams-02`, a `fileserver01` stands out. On the GUI's **Decoys** page, set
+  the hostname, banner, Server header and page title to fit in.
 - **Give it an address nothing uses.** No legitimate client should have any
   reason to reach it, so every event means something.
 - **Keep it out of anything that would be used normally.** Don't put the

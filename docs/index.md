@@ -33,7 +33,7 @@ GitHub
 <div class="es-hero-copy es-rise">
 <div class="es-eyebrow"><span class="es-eyebrow-dot"></span>Honeypot · part of EasySYS</div>
 <h1 class="es-h1">Nobody should knock. When someone does, you'll know.</h1>
-<p class="es-lead">EasyDecoy runs fake network services, a Telnet login and a web admin panel, that look real and lead nowhere. Nothing legitimate ever connects to them, so every connection, request and login attempt is worth a look. Each one is recorded as a JSON event and can be forwarded over syslog.</p>
+<p class="es-lead">EasyDecoy runs fake network services, a Telnet login and a web admin panel, that look real and lead nowhere. Nothing legitimate ever connects to them, so every connection, request and login attempt is worth a look. Each one is recorded, shown on a web dashboard, and can be forwarded over syslog.</p>
 <div class="es-actions">
 <a class="es-btn es-btn--primary es-btn--lg" href="#install">
 Get started
@@ -45,6 +45,7 @@ Get started
 <span class="es-pill"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2"></rect><path d="M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4"></path></svg>Rust core</span>
 <span class="es-pill"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 8l-9-5-9 5v8l9 5 9-5V8z"></path><path d="M3 8l9 5 9-5M12 13v8"></path></svg>Single binary</span>
 <span class="es-pill"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"></rect><path d="M8 11V7a4 4 0 018 0v4"></path></svg>Never stores passwords</span>
+<span class="es-pill"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="14" rx="2"></rect><path d="M3 9h18M8 21h8"></path></svg>Web GUI</span>
 <span class="es-pill"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"></path></svg>JSON + syslog</span>
 </div>
 </div>
@@ -120,11 +121,11 @@ Login incorrect
 <div class="es-card ed-type ed-type-wide">
 <div class="ed-type-top">
 <div class="es-icon"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"></path><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4 12.5-12.5z"></path></svg></div>
-<span class="es-tag es-mono">easydecoy.toml</span>
+<span class="es-tag es-mono">GUI</span>
 </div>
 <span class="es-kicker">Made to look like yours</span>
 <h3 class="es-h3">Named the way your real machines are</h3>
-<p class="es-product-text">A decoy called <code>fileserver01</code> on a network of <code>fs-ams-02</code>s stands out. Set the banner, the hostname in the prompt, the web server's <code>Server</code> header and the sign-in page's title to match what an intruder expects to find.</p>
+<p class="es-product-text">A decoy called <code>fileserver01</code> on a network of <code>fs-ams-02</code>s stands out. From the GUI, set the banner, the hostname in the prompt, the web server's <code>Server</code> header and the sign-in page's title to match what an intruder expects to find. Each decoy restarts as you save it.</p>
 <div class="es-tags"><span class="es-tag">banner</span><span class="es-tag">hostname</span><span class="es-tag">server_header</span><span class="es-tag">title</span></div>
 </div>
 </div>
@@ -161,12 +162,12 @@ Login incorrect
 <div class="es-card ed-feature">
 <div class="es-icon es-icon--sm"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"></circle><path d="M4 21v-1a6 6 0 0112 0v1"></path><path d="M19 8v6M16 11h6"></path></svg></div>
 <h3 class="ed-feature-title">Least privilege</h3>
-<p class="ed-feature-text">The service runs as its own account with one capability, binding ports below 1024, inside a systemd sandbox that leaves it the log directory and nothing else to write to.</p>
+<p class="ed-feature-text">The service runs as its own account with one capability, binding ports below 1024, inside a systemd sandbox that leaves it its own data and log directories and nothing else to write to.</p>
 </div>
 <div class="es-card ed-feature">
 <div class="es-icon es-icon--sm"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"></path></svg></div>
-<h3 class="ed-feature-title">JSON lines and syslog</h3>
-<p class="ed-feature-text">One JSON object per event, ready for <code>jq</code>, and a copy to any syslog collector, EasyLog included. A collector that is down never holds up the local record.</p>
+<h3 class="ed-feature-title">A dashboard, JSON and syslog</h3>
+<p class="ed-feature-text">Events are kept in SQLite and shown on the GUI's dashboard, exported as JSON lines for <code>jq</code>, and copied to any syslog collector, EasyLog included. A collector that is down never holds up the local record.</p>
 </div>
 </div>
 </div>
@@ -176,11 +177,11 @@ Login incorrect
 <div class="es-head--stack">
 <span class="es-kicker-lg">Architecture</span>
 <h2 class="es-h2">Decoys on your network, events on your desk.</h2>
-<p class="es-desc">Each decoy reports what happens to it to a single event writer, which appends one JSON line to the events file and hands a copy to the syslog sender. You read the file directly, or the collector it feeds.</p>
+<p class="es-desc">Each decoy reports what happens to it to a single event writer, which stores it in the database and hands a copy to the syslog sender. You read it in the web GUI, on this machine through an SSH tunnel, or in the collector syslog feeds.</p>
 </div>
 <div class="es-diagram">
 <div class="es-diagram-scroll">
-<svg viewBox="0 0 1120 440" role="img" aria-label="Diagram: port scans, intruders and malware reach the Telnet and HTTP decoys inside EasyDecoy; both report to an event writer, which appends to events.jsonl, read by administrators, and sends a copy over syslog to EasyLog or another collector.">
+<svg viewBox="0 0 1120 440" role="img" aria-label="Diagram: port scans, intruders and malware reach the Telnet and HTTP decoys inside EasyDecoy; both report to an event writer, which stores events in a SQLite database that administrators read through the web GUI, and sends a copy over syslog to EasyLog or another collector.">
 <defs>
 <marker id="ed-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="a-head" d="M0 0L10 5L0 10z"></path></marker>
 <marker id="ed-ahb" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="a-head a-head--es" d="M0 0L10 5L0 10z"></path></marker>
@@ -195,9 +196,9 @@ Login incorrect
 <g class="a-box"><rect x="324" y="132" width="150" height="80" rx="10"></rect><text class="a-title" x="340" y="164">Telnet decoy</text><text class="a-sub" x="340" y="188">:23 login</text></g>
 <g class="a-box"><rect x="324" y="292" width="150" height="92" rx="10"></rect><text class="a-title" x="340" y="328">HTTP decoy</text><text class="a-sub" x="340" y="354">:80 sign-in</text></g>
 <g class="a-box"><rect x="505" y="212" width="150" height="80" rx="10"></rect><text class="a-title" x="521" y="244">Event writer</text><text class="a-sub" x="521" y="268">one JSON line</text></g>
-<g class="a-box"><rect x="686" y="132" width="150" height="80" rx="10"></rect><text class="a-title" x="702" y="164">events.jsonl</text><text class="a-sub" x="702" y="188">/var/log/…</text></g>
+<g class="a-box"><rect x="686" y="132" width="150" height="80" rx="10"></rect><text class="a-title" x="702" y="164">Database</text><text class="a-sub" x="702" y="188">SQLite · web GUI</text></g>
 <g class="a-box"><rect x="686" y="292" width="150" height="92" rx="10"></rect><text class="a-title" x="702" y="328">Syslog</text><text class="a-sub" x="702" y="354">UDP · TCP</text></g>
-<g class="a-ext"><rect x="900" y="134" width="220" height="76" rx="10"></rect><text class="a-title" x="920" y="166">Administrators</text><text class="a-sub" x="920" y="190">tail · jq</text></g>
+<g class="a-ext"><rect x="900" y="134" width="220" height="76" rx="10"></rect><text class="a-title" x="920" y="166">Administrators</text><text class="a-sub" x="920" y="190">HTTPS · SSH tunnel</text></g>
 <g class="a-es"><rect x="900" y="294" width="220" height="88" rx="10"></rect><text class="a-title" x="922" y="330">EasyLog</text><text class="a-sub" x="922" y="356">or any collector</text></g>
 <path class="a-line" fill="none" d="M220 84 H262 V160 H322" marker-end="url(#ed-ah)"></path>
 <text class="a-label" x="226" y="76">telnet</text>
@@ -218,7 +219,7 @@ Login incorrect
 <div class="es-legend">
 <span><span class="es-swatch"></span>EasySYS service</span>
 <span><span class="es-swatch es-swatch--ext"></span>Your network and people</span>
-<span class="es-legend-note">The events file is always written first. Syslog is a copy, and a collector that is down never holds it up.</span>
+<span class="es-legend-note">The database keeps every event. Syslog is a copy, and a collector that is down never holds it up.</span>
 </div>
 </div>
 </div>
@@ -230,9 +231,9 @@ Login incorrect
 <h2 class="es-h2">One package. Live when you say so.</h2>
 <p class="es-desc">EasyDecoy is published as <code>.deb</code> and <code>.rpm</code> packages for x86_64 and arm64 on every GitHub release. Installing starts nothing: the decoys go live when you enable the service. The <a href="install/">installation guide</a> has the details.</p>
 <div class="es-steps">
-<div class="es-step"><span class="es-step-num es-mono">1</span><div><div class="es-step-title">Install the package</div><div class="es-step-text">It creates the <code>easydecoy</code> account and a default config.</div></div></div>
-<div class="es-step"><span class="es-step-num es-mono">2</span><div><div class="es-step-title">Make the decoys look like yours</div><div class="es-step-text">Ports, banner, hostname and page title live in one TOML file.</div></div></div>
-<div class="es-step"><span class="es-step-num es-mono">3</span><div><div class="es-step-title">Enable it and watch</div><div class="es-step-text">Events land in <code>/var/log/easydecoy</code>, and on your syslog collector if you set one.</div></div></div>
+<div class="es-step"><span class="es-step-num es-mono">1</span><div><div class="es-step-title">Install and enable it</div><div class="es-step-text">The package creates the <code>easydecoy</code> account; the service starts the decoys and the GUI.</div></div></div>
+<div class="es-step"><span class="es-step-num es-mono">2</span><div><div class="es-step-title">Open the GUI over SSH</div><div class="es-step-text">It listens on the host itself only. Create the admin account on the first visit.</div></div></div>
+<div class="es-step"><span class="es-step-num es-mono">3</span><div><div class="es-step-title">Make the decoys look like yours, and watch</div><div class="es-step-text">Ports, banner, hostname and page title are set in the GUI. Events land on its dashboard, and on your syslog collector if you set one.</div></div></div>
 </div>
 </div>
 <div class="es-terminal es-code">
@@ -248,30 +249,30 @@ Login incorrect
 </div>
 <div class="es-panel es-panel--deb"><div class="es-term-body es-mono"><span class="t-c"># 1 — download from github.com/easysysio/EasyDecoy/releases</span>
 <span class="t-p">$</span> sudo apt install ./easydecoy_*_amd64.deb   <span class="t-c"># or _arm64.deb</span>
-<span class="t-c"># 2 — make the decoys look like yours</span>
-<span class="t-p">$</span> sudoedit /etc/easydecoy/easydecoy.toml
-<span class="t-c"># 3 — go live, and watch</span>
 <span class="t-p">$</span> sudo systemctl enable --now easydecoy
-<span class="t-p">$</span> sudo tail -f /var/log/easydecoy/events.jsonl</div></div>
+<span class="t-c"># 2 — from your computer: tunnel to the GUI</span>
+<span class="t-p">$</span> ssh -L 9443:127.0.0.1:9443 decoy-host
+<span class="t-c"># 3 — open https://localhost:9443/, create the admin,</span>
+<span class="t-c">#     and make the decoys look like yours</span></div></div>
 <div class="es-panel es-panel--rpm"><div class="es-term-body es-mono"><span class="t-c"># 1 — download from github.com/easysysio/EasyDecoy/releases</span>
 <span class="t-p">$</span> sudo dnf install ./easydecoy-*.x86_64.rpm   <span class="t-c"># or .aarch64.rpm</span>
-<span class="t-c"># 2 — make the decoys look like yours</span>
-<span class="t-p">$</span> sudoedit /etc/easydecoy/easydecoy.toml
-<span class="t-c"># 3 — go live, and watch</span>
 <span class="t-p">$</span> sudo systemctl enable --now easydecoy
-<span class="t-p">$</span> sudo tail -f /var/log/easydecoy/events.jsonl</div></div>
+<span class="t-c"># 2 — from your computer: tunnel to the GUI</span>
+<span class="t-p">$</span> ssh -L 9443:127.0.0.1:9443 decoy-host
+<span class="t-c"># 3 — open https://localhost:9443/, create the admin,</span>
+<span class="t-c">#     and make the decoys look like yours</span></div></div>
 <div class="es-panel es-panel--suse"><div class="es-term-body es-mono"><span class="t-c"># 1 — download from github.com/easysysio/EasyDecoy/releases</span>
 <span class="t-p">$</span> sudo zypper install ./easydecoy-*.x86_64.rpm   <span class="t-c"># or .aarch64.rpm</span>
-<span class="t-c"># 2 — make the decoys look like yours</span>
-<span class="t-p">$</span> sudoedit /etc/easydecoy/easydecoy.toml
-<span class="t-c"># 3 — go live, and watch</span>
 <span class="t-p">$</span> sudo systemctl enable --now easydecoy
-<span class="t-p">$</span> sudo tail -f /var/log/easydecoy/events.jsonl</div></div>
+<span class="t-c"># 2 — from your computer: tunnel to the GUI</span>
+<span class="t-p">$</span> ssh -L 9443:127.0.0.1:9443 decoy-host
+<span class="t-c"># 3 — open https://localhost:9443/, create the admin,</span>
+<span class="t-c">#     and make the decoys look like yours</span></div></div>
 <div class="es-panel es-panel--air"><div class="es-term-body es-mono"><span class="t-c"># 1 — build it (needs a Rust toolchain)</span>
 <span class="t-p">$</span> git clone https://github.com/easysysio/EasyDecoy
 <span class="t-p">$</span> cd EasyDecoy
 <span class="t-c"># 2 — run it: telnet on :2323, http on :8080</span>
-<span class="t-p">$</span> cargo run | jq .
+<span class="t-p">$</span> cargo run    <span class="t-c"># GUI on https://127.0.0.1:9443/</span>
 <span class="t-c"># 3 — knock, from another terminal</span>
 <span class="t-p">$</span> telnet localhost 2323</div></div>
 </div>
@@ -301,6 +302,7 @@ Login incorrect
 <div class="es-footer-col">
 <span class="es-footer-title">Documentation</span>
 <a href="install/">Installation</a>
+<a href="gui/">The GUI</a>
 <a href="configuration/">Configuration</a>
 <a href="decoys/">Decoys</a>
 <a href="events/">Events</a>

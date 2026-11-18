@@ -1,46 +1,52 @@
 // =============================================================================
 // main.rs — EasyDecoy entry point
 //
-// Boots EasyDecoy: loads config, starts the event writer, then runs every
-// enabled decoy (fake network service) until one of them fails or the process
-// is interrupted. Nobody legitimate has a reason to connect to a decoy, so
-// every event it records is worth a look.
+// Boots EasyDecoy: reads the config file (log level, database, GUI address),
+// opens the database, starts the event writer and every enabled decoy (fake
+// network service), and serves the management GUI, until it is told to stop.
+// Nobody legitimate has a reason to connect to a decoy, so every event it
+// records is worth a look.
 //
-// The only command-line arguments are --help and --version; settings come from
-// the config file named by EASYDECOY_CONFIG.
+// The decoys and everything else are set in the GUI and kept in the database.
+// A 0.1.0 config file's settings become the database's on its first start.
+//
+// The only command-line arguments are --help and --version.
 // =============================================================================
 
 mod config;
+mod db;
 mod decoy;
 mod event;
+mod settings;
+mod store;
+mod supervisor;
 mod syslog;
+mod web;
 
 use std::io::IsTerminal;
-use std::sync::Arc;
 use std::time::Duration;
 
-use anyhow::{Context, Result, bail};
-use tokio::sync::Semaphore;
-use tokio::task::JoinSet;
+use anyhow::{Context, Result};
 use tracing_subscriber::EnvFilter;
 
 use crate::config::Config;
-use crate::decoy::Shared;
-use crate::decoy::http::Http;
-use crate::decoy::telnet::Telnet;
+use crate::settings::{Settings, SettingsStore};
 
 // Default config path; overridable via the EASYDECOY_CONFIG env var.
 const DEFAULT_CONFIG: &str = "config/easydecoy.toml";
 
-// What --help prints. EasyDecoy takes no other arguments: everything is in the
-// config file.
+// How long events still queued at shutdown get to reach the database.
+const DRAIN: Duration = Duration::from_secs(5);
+
+// What --help prints.
 const USAGE: &str = "\
 Usage: easydecoy [--help | --version]
 
-EasyDecoy runs decoy network services and records every connection to them as
-a JSON event. It takes no other arguments: settings live in a TOML config file,
+EasyDecoy runs decoy network services and records every connection to them.
+Its decoys, events and settings are managed in a web GUI (by default
+https://127.0.0.1:9443/) and kept in a SQLite database. A small TOML file,
 read from the path in the EASYDECOY_CONFIG environment variable (default:
-config/easydecoy.toml).
+config/easydecoy.toml), says where the database is and where the GUI listens.
 
   -h, --help       print this help and exit
   -V, --version    print the version and exit";
@@ -69,11 +75,6 @@ fn parse_args(mut args: impl Iterator<Item = String>) -> Cli {
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// main()
-// Process entry point: read config, install logging, start the event writer
-// and every enabled decoy, then wait for a failure or Ctrl-C.
-// ─────────────────────────────────────────────────────────────────────────────
 #[tokio::main]
 async fn main() -> Result<()> {
     match parse_args(std::env::args().skip(1)) {
@@ -94,20 +95,16 @@ async fn main() -> Result<()> {
 
     // The config sets the log level, so it is read before the subscriber is
     // installed; anything that goes wrong here is reported by the returned error.
-    let config_path =
-        std::env::var("EASYDECOY_CONFIG").unwrap_or_else(|_| DEFAULT_CONFIG.to_string());
+    let config_path = std::env::var("EASYDECOY_CONFIG").unwrap_or_else(|_| DEFAULT_CONFIG.to_string());
     let (config, from_file) = Config::load(&config_path)?;
 
-    // Our own log goes to stderr: stdout is reserved for events when no events
-    // file is configured. RUST_LOG still wins over the config's log_level.
+    // Our own log goes to stderr: stdout is reserved for events when the
+    // events file is "-". RUST_LOG still wins over the config's log_level.
     // Colour only on a terminal, so journald doesn't store escape codes.
     tracing_subscriber::fmt()
         .with_writer(std::io::stderr)
         .with_ansi(std::io::stderr().is_terminal())
-        .with_env_filter(
-            EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| EnvFilter::new(config.log_level.trim())),
-        )
+        .with_env_filter(EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(config.log_level.trim())))
         .init();
     tracing::info!("EasyDecoy v{} starting", env!("CARGO_PKG_VERSION"));
     if from_file {
@@ -116,54 +113,143 @@ async fn main() -> Result<()> {
         tracing::info!("config: {config_path} not found, running with defaults");
     }
 
-    let syslog = config.syslog.enabled.then(|| syslog::spawn(&config.syslog));
-    let events = event::spawn_writer(&config.events_file, syslog).await?;
-    tracing::info!(
-        "events: {}",
-        if config.events_file.trim().is_empty() { "stdout" } else { config.events_file.trim() }
-    );
-    if config.syslog.enabled {
-        let s = &config.syslog;
-        tracing::info!(
-            "syslog: {} to {} ({}, {})",
-            format!("{:?}", s.protocol).to_lowercase(),
-            s.server,
-            format!("{:?}", s.format).to_lowercase(),
-            format!("{:?}", s.facility).to_lowercase(),
-        );
+    // rustls needs a process-wide crypto provider chosen explicitly (see the
+    // axum-server line in Cargo.toml).
+    rustls::crypto::ring::default_provider()
+        .install_default()
+        .map_err(|_| anyhow::anyhow!("installing the TLS crypto provider"))?;
+
+    let gui = config.gui_addr()?;
+    // Bound first: if the port is taken, nothing else has started yet.
+    let listener = web::bind(gui)?;
+
+    let db_file = config.db_file();
+    let db = db::open(&db_file).await?;
+    tracing::info!("database: {db_file}");
+
+    let (settings, empty) = SettingsStore::load(db.clone()).await?;
+    first_start(&settings, &config, empty, gui, &config_path).await?;
+
+    let removed = store::prune(&db, settings.current().recording.retention_days).await.unwrap_or_else(|e| {
+        tracing::warn!("retention: {e:#}");
+        0
+    });
+    if removed > 0 {
+        tracing::info!("retention: deleted {removed} old event(s)");
     }
 
-    let shared = Shared {
-        events,
-        slots: Arc::new(Semaphore::new(config.max_connections)),
-        idle: Duration::from_secs(config.idle_timeout_secs),
-        session: Duration::from_secs(config.session_limit_secs),
+    let (events, writer) = event::spawn_writer(db.clone(), settings.clone()).await;
+    let (status, decoys) = supervisor::spawn(settings.clone(), events);
+    let retention = tokio::spawn(store::serve_retention(db.clone(), settings.clone()));
+
+    let pem = web::tls::load(&db, &config, gui).await?;
+    let state = web::AppState::new(db.clone(), settings.clone(), status, gui, db_file)?;
+    if let Some(warning) = web::gui_warning(gui, &settings.current()) {
+        tracing::warn!("{warning}");
+    }
+    tracing::info!("GUI: https://{gui}/ (certificate: {})", pem.source);
+    let mut gui_task = tokio::spawn(web::serve(state, listener, pem.cert, pem.key));
+
+    let result = tokio::select! {
+        finished = &mut gui_task => match finished {
+            Ok(result) => result,
+            Err(e) => Err(anyhow::anyhow!("the GUI task stopped: {e}")),
+        },
+        reason = stop_signal() => {
+            tracing::info!("stopping on {reason}");
+            Ok(())
+        }
     };
 
-    let mut decoys = JoinSet::new();
-    if config.telnet.enabled {
-        let telnet = Arc::new(Telnet::new(&config.telnet));
-        decoys.spawn(decoy::serve(telnet, config.telnet.bind.clone(), shared.clone()));
+    // Decoys first, so nothing new arrives; then the writer drains what is
+    // queued (the decoys' senders are gone, so it ends) and the database closes.
+    gui_task.abort();
+    decoys.abort();
+    retention.abort();
+    let _ = decoys.await;
+    if tokio::time::timeout(DRAIN, writer).await.is_err() {
+        tracing::warn!("some queued events were not stored before shutdown");
     }
-    if config.http.enabled {
-        let http = Arc::new(Http::new(&config.http));
-        decoys.spawn(decoy::serve(http, config.http.bind.clone(), shared.clone()));
-    }
-    if decoys.is_empty() {
-        bail!("no decoys are enabled in {config_path}");
-    }
+    db::close(&db).await;
+    result
+}
 
-    // A decoy only returns if it could not start (usually a port already in
-    // use); that stops EasyDecoy rather than leaving it half running.
-    tokio::select! {
-        Some(finished) = decoys.join_next() => {
-            finished.context("a decoy task panicked")??;
+// ─────────────────────────────────────────────────────────────────────────────
+// first_start(settings, config, empty, gui, path)
+// On an empty database, stores the first settings: a 0.1.0 config file's, or
+// the defaults. After that, any 0.1.0 settings left in the file are ignored,
+// and the log says so once per start.
+// ─────────────────────────────────────────────────────────────────────────────
+async fn first_start(
+    settings: &SettingsStore,
+    config: &Config,
+    empty: bool,
+    gui: std::net::SocketAddr,
+    path: &str,
+) -> Result<()> {
+    let legacy = config.legacy();
+    if !empty {
+        if legacy.is_some() {
+            tracing::warn!(
+                "{path} still has 0.1.0 settings (telnet, http, syslog, ...); they were imported on the \
+                 first start and are now ignored. Change them in the GUI, and remove them from the file."
+            );
         }
-        _ = tokio::signal::ctrl_c() => {
-            tracing::info!("interrupted, shutting down");
+        return Ok(());
+    }
+    let first = match legacy {
+        Some(imported) => {
+            match imported.check(gui) {
+                Ok(()) => tracing::info!("first start: imported the decoy, syslog and limit settings from {path}"),
+                // Stored anyway: the GUI is where they get fixed, and a decoy
+                // that can't start says why there.
+                Err(problem) => tracing::warn!("first start: imported the settings from {path}, but: {problem}"),
+            }
+            imported
+        }
+        None => {
+            let mut defaults = Settings::default();
+            // As the packaged service (systemd gives it a state directory),
+            // the decoys take the real ports, as 0.1.0's package did. One
+            // that is taken shows as not running in the GUI.
+            if std::env::var_os("STATE_DIRECTORY").is_some() {
+                defaults.telnet.bind = "0.0.0.0:23".to_string();
+                defaults.http.bind = "0.0.0.0:80".to_string();
+            }
+            tracing::info!(
+                "first start: default settings (Telnet on {}, HTTP on {})",
+                defaults.telnet.bind,
+                defaults.http.bind
+            );
+            defaults
+        }
+    };
+    settings.save(first).await.context("storing the first settings")
+}
+
+/// Waits for the signal a service manager stops a process with (SIGTERM), or
+/// for Ctrl-C.
+async fn stop_signal() -> &'static str {
+    #[cfg(unix)]
+    {
+        use tokio::signal::unix::{SignalKind, signal};
+        match signal(SignalKind::terminate()) {
+            Ok(mut term) => tokio::select! {
+                _ = term.recv() => "SIGTERM",
+                _ = tokio::signal::ctrl_c() => "Ctrl-C",
+            },
+            Err(e) => {
+                tracing::warn!("cannot listen for SIGTERM: {e}");
+                let _ = tokio::signal::ctrl_c().await;
+                "Ctrl-C"
+            }
         }
     }
-    Ok(())
+    #[cfg(not(unix))]
+    {
+        let _ = tokio::signal::ctrl_c().await;
+        "Ctrl-C"
+    }
 }
 
 #[cfg(test)]

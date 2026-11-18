@@ -22,9 +22,9 @@ the next intruder to find.
 
 | Protection | Limit |
 |---|---|
-| Open sessions, across all decoys | `max_connections`, default 256 |
-| Silence before a client is dropped | `idle_timeout_secs`, default 30 s |
-| Longest session | `session_limit_secs`, default 120 s |
+| Open sessions, across all decoys | Concurrent sessions, default 256 |
+| Silence before a client is dropped | Idle timeout, default 30 s |
+| Longest session | Session limit, default 120 s |
 | Telnet line | 1024 bytes |
 | HTTP request head / body | 8 KiB / 4 KiB |
 | Recorded text, per field | 16 to 512 characters |
@@ -43,7 +43,8 @@ The packaged service runs as its own `easydecoy` account, never as root. Its
 one extra permission is binding ports below 1024 (`CAP_NET_BIND_SERVICE`).
 systemd then takes away what it has no use for:
 
-- The whole filesystem is **read-only** to it, except `/var/log/easydecoy`.
+- The whole filesystem is **read-only** to it, except its database in
+  `/var/lib/easydecoy` and `/var/log/easydecoy`.
 - No access to home directories or devices, and a private `/tmp`.
 - No new privileges, no set-uid, no kernel tunables or modules, no clock,
   hostname or namespace changes.
@@ -58,6 +59,23 @@ systemd then takes away what it has no use for:
     containers, LXC in particular, don't always provide. If the service fails
     to start inside one, `journalctl -u easydecoy` names the setting.
 
+## The management GUI
+
+A honeypot's GUI runs on a machine built to be found and probed, so it is
+kept out of the way:
+
+- **It listens on `127.0.0.1` by default**, reached over an SSH tunnel. The
+  decoys face the network; the GUI doesn't.
+- **A decoy can never take the GUI's port**, and every page warns while the
+  GUI listens on all addresses or shares one with a decoy.
+- **It is HTTPS only**, with a self-signed certificate made on the first start
+  or one you provide.
+- **Sign-in is guarded**: bcrypt password hashes, sessions stored only as a
+  hash of their token, a CSRF token on every form, a lockout after 5 failed
+  sign-ins from one address, and an audit log of every sign-in and change.
+  [The GUI page](gui.md#sign-in-and-sessions) has the details.
+- **The database is readable by the service account only** (mode 0600).
+
 ## What EasyDecoy does not do
 
 - **It is not invisible.** A careful intruder can tell a low-interaction decoy
@@ -66,7 +84,9 @@ systemd then takes away what it has no use for:
   moves through a network.
 - **It does not block anyone.** It records; acting on what it records is up to
   you or your collector.
-- **No encryption.** There is no HTTPS or SSH decoy yet, and syslog is sent as
-  plain UDP or TCP. Keep the path to your collector on a network you trust.
-- **The events file is not tamper-proof.** Anyone with root on the decoy host
-  can edit it. Sending events to a collector keeps a copy out of reach.
+- **No encrypted decoys.** There is no HTTPS or SSH decoy yet, and syslog is
+  sent as plain UDP or TCP. Keep the path to your collector on a network you
+  trust.
+- **Events on the host are not tamper-proof.** Anyone with root on the decoy
+  host can edit the database or the events file. Sending events to a
+  collector keeps a copy out of reach.

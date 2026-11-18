@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+{# dashboard.html — what the decoys have seen over the chosen period. #}
+{% block title %}Dashboard{% endblock %}
+{% macro status_badge(d) %}
+  {% if d.state == "running" %}<span class="badge text-bg-success"><i class="bi bi-circle-fill me-1 small"></i>Running</span>
+  {% elif d.state == "failed" %}<span class="badge text-bg-danger"><i class="bi bi-x-circle me-1"></i>Not running</span>
+  {% elif d.state == "starting" %}<span class="badge text-bg-secondary">Starting</span>
+  {% else %}<span class="badge text-bg-secondary">Off</span>{% endif %}
+{% endmacro %}
+{% macro ranked(title, rows, empty, link) %}
+<div class="card h-100">
+  <div class="card-body">
+    <div class="section-title mb-3">{{ title }}</div>
+    {% if rows | length == 0 %}
+    <p class="text-secondary small mb-0">{{ empty }}</p>
+    {% else %}
+    {% set top = rows | first %}
+    <table class="table table-sm mb-0">
+      <tbody>
+      {% for r in rows %}
+        <tr>
+          <td class="truncate mono" style="width:60%" title="{{ r.value }}">
+            {% if link %}<a href="/events?{{ link }}={{ r.value | urlencode_strict }}">{{ r.value }}</a>{% else %}{{ r.value }}{% endif %}
+          </td>
+          <td style="width:25%"><div class="progress"><div class="progress-bar" style="width:{{ r.count * 100 / top.count }}%"></div></div></td>
+          <td class="text-end" style="width:15%; font-variant-numeric:tabular-nums">{{ r.count }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
+  </div>
+</div>
+{% endmacro %}
+
+{% block content %}
+
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-4">
+  <h1 class="h3 mb-0">Dashboard</h1>
+  <div class="btn-group btn-group-sm" role="group" aria-label="Period">
+    {% for r in ["24h", "7d", "30d"] %}
+    <a class="btn {% if range == r %}btn-primary{% else %}btn-outline-secondary{% endif %}" href="/?range={{ r }}">{{ r }}</a>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-6 col-lg-3"><div class="card h-100"><div class="card-body">
+    <div class="stat-label">Events</div><div class="stat-value">{{ summary.events }}</div>
+  </div></div></div>
+  <div class="col-6 col-lg-3"><div class="card h-100"><div class="card-body">
+    <div class="stat-label">Login attempts</div><div class="stat-value">{{ summary.logins }}</div>
+  </div></div></div>
+  <div class="col-6 col-lg-3"><div class="card h-100"><div class="card-body">
+    <div class="stat-label">Source addresses</div><div class="stat-value">{{ summary.sources }}</div>
+  </div></div></div>
+  <div class="col-6 col-lg-3"><div class="card h-100"><div class="card-body">
+    <div class="stat-label mb-2">Decoys</div>
+    {% for d in decoys %}
+    <div class="d-flex justify-content-between align-items-center small mb-1">
+      <a href="/decoys" class="text-reset text-decoration-none"><i class="bi {{ d.icon }} me-1"></i>{{ d.label }}</a>
+      {{ self::status_badge(d=d) }}
+    </div>
+    {% endfor %}
+  </div></div></div>
+</div>
+
+<div class="card mb-4">
+  <div class="card-body">
+    <div class="d-flex justify-content-between mb-3">
+      <div class="section-title">Events over time</div>
+      <div class="small text-secondary">peak {{ summary.peak }}</div>
+    </div>
+    <div data-granularity="{{ granularity }}">
+      <div class="tl-bars">
+        {% for b in summary.timeline %}
+        <div class="col" data-ts="{{ b.start }}" data-events="{{ b.events }}" data-logins="{{ b.logins }}">
+          {% if b.events > 0 %}<div class="bar" style="height:{{ b.height }}%"></div>{% else %}<div class="bar empty"></div>{% endif %}
+        </div>
+        {% endfor %}
+      </div>
+      <div class="tl-xaxis">
+        {% for b in summary.timeline %}
+        {% set step = label_every * 2 %}
+        <div class="xl {% if loop.index0 % step == label_every %}alt{% endif %}" {% if loop.index0 % label_every == 0 %}data-ts="{{ b.start }}"{% endif %}></div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<div class="row g-3 mb-4">
+  <div class="col-lg-4">{{ self::ranked(title="Top sources", rows=summary.top_sources, empty="No connections yet.", link="src") }}</div>
+  <div class="col-lg-4">{{ self::ranked(title="Top usernames tried", rows=summary.top_usernames, empty="No login attempts yet.", link="q") }}</div>
+  <div class="col-lg-4">{{ self::ranked(title="Top HTTP paths", rows=summary.top_paths, empty="No HTTP requests yet.", link="q") }}</div>
+</div>
+
+<div class="card">
+  <div class="card-body">
+    <div class="d-flex justify-content-between mb-2">
+      <div class="section-title">Latest events</div>
+      <a class="small" href="/events">All events <i class="bi bi-arrow-right"></i></a>
+    </div>
+    {% if latest | length == 0 %}
+    <p class="text-secondary small mb-0">
+      Nothing yet. Every connection to a decoy shows up here; nobody legitimate has a reason to make one.
+    </p>
+    {% else %}
+    <div class="table-responsive">
+      <table class="table table-sm mb-0">
+        <thead><tr><th>Time</th><th>Decoy</th><th>Event</th><th>Source</th><th>What</th></tr></thead>
+        <tbody>
+        {% for e in latest %}
+          <tr>
+            <td class="text-nowrap small"><span data-utc="{{ e.time }}" data-style="short">{{ e.time }}</span></td>
+            <td>{{ e.decoy }}</td>
+            <td><span class="badge {% if e.kind == 'login_attempt' %}text-bg-danger{% elif e.kind == 'connect' %}text-bg-secondary{% else %}text-bg-info{% endif %}">{{ e.kind }}</span></td>
+            <td class="mono"><a href="/events?src={{ e.src_ip | urlencode_strict }}">{{ e.src_ip }}</a></td>
+            <td class="truncate mono" style="width:40%" title="{{ e.summary }}">{{ e.summary }}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

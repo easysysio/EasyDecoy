@@ -1,46 +1,21 @@
-# EasyDecoy configuration.
+# EasyDecoy configuration — what is needed before the GUI exists.
 #
 # Read from the path in EASYDECOY_CONFIG (default: config/easydecoy.toml).
-# Every setting has a default, so any of them can be left out; a misspelled
-# key is reported at startup rather than ignored.
+# The decoys, syslog and everything else are set in the management GUI and kept
+# in the database. A misspelled key is reported at startup rather than ignored.
 
 # EasyDecoy's own log, written to stderr.
 log_level = "info"     # error | warn | info | debug | trace (RUST_LOG wins)
 
-# Events — one JSON object per line — are appended to this file. Leave empty to
-# write them to stdout instead, e.g. to pipe them into jq:
-#   cargo run | jq .
-events_file = ""
+# The database: settings, events, accounts. Created on the first start.
+db_path = "easydecoy.db"
 
-# Limits every decoy runs under. Sessions beyond max_connections are closed at
-# once, a client silent for idle_timeout_secs is disconnected, and no session
-# lasts longer than session_limit_secs.
-max_connections    = 256
-idle_timeout_secs  = 30
-session_limit_secs = 120
+# The management GUI, always HTTPS. On this machine only: a decoy host's other
+# addresses are for intruders to find. Open https://127.0.0.1:9443/ and create
+# the admin account on the first visit.
+gui_bind = "127.0.0.1:9443"
 
-# The default ports need no privileges. To use the real ones (23, 80), run with
-# CAP_NET_BIND_SERVICE rather than as root.
-
-[telnet]
-enabled  = true
-bind     = "0.0.0.0:2323"
-banner   = "Ubuntu 22.04.4 LTS"   # printed on connect, like /etc/issue.net
-hostname = "fileserver01"         # the prompt reads "fileserver01 login:"
-
-[http]
-enabled       = true
-bind          = "0.0.0.0:8080"
-server_header = "nginx/1.24.0"    # empty leaves the Server header out
-title         = "Admin Console"
-
-# Send every event to a syslog collector as well, e.g. EasyLog. The message
-# text is the event's JSON line. Syslog is a copy: events are always written
-# locally first, and a collector that is down only costs dropped messages.
-[syslog]
-enabled  = false
-server   = "127.0.0.1:514"    # host:port
-protocol = "udp"              # udp | tcp (newline-framed)
-format   = "rfc5424"          # rfc5424 | rfc3164
-facility = "local0"           # user | daemon | auth | authpriv | local0 … local7
-hostname = ""                 # empty uses this machine's name
+# A certificate and key (PEM) for the GUI. Leave both empty to use a
+# self-signed certificate, made on the first start.
+gui_cert = ""
+gui_key  = ""

@@ -23,6 +23,7 @@ use anyhow::{Context, Result};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::Semaphore;
+use tokio::task::JoinSet;
 
 use crate::event::{Event, EventTx};
 
@@ -35,7 +36,7 @@ pub trait Decoy: Send + Sync + 'static {
     fn handle(&self, conn: Conn) -> impl Future<Output = Result<()>> + Send;
 }
 
-/// What every decoy runs with: where events go and the limits from config.
+/// What every decoy runs with: where events go and the limits from settings.
 #[derive(Clone)]
 pub struct Shared {
     pub events: EventTx,
@@ -81,19 +82,30 @@ impl Conn {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// serve(decoy, bind, shared)
-// Listens on `bind` and gives each client to `decoy`, recording a connect
-// event first. Returns only if the listener cannot be bound; failures of a
-// single session end that session and nothing else.
+// bind(name, address)
+// Opens a decoy's listener. Kept apart from `serve` so the supervisor can tell
+// "could not start" (reported in the GUI, retried) from "running".
 // ─────────────────────────────────────────────────────────────────────────────
-pub async fn serve<D: Decoy>(decoy: Arc<D>, bind: String, shared: Shared) -> Result<()> {
-    let listener = TcpListener::bind(&bind)
-        .await
-        .with_context(|| format!("{} decoy: binding {bind}", D::NAME))?;
-    tracing::info!("{} decoy listening on {bind}", D::NAME);
+pub async fn bind(name: &str, address: &str) -> Result<TcpListener> {
+    TcpListener::bind(address).await.with_context(|| format!("{name} decoy: binding {address}"))
+}
 
+// ─────────────────────────────────────────────────────────────────────────────
+// serve(decoy, listener, shared)
+// Gives each client of `listener` to `decoy`, recording a connect event first.
+// Runs until the task running it is stopped; failures of a single session end
+// that session and nothing else. Sessions belong to this call, so stopping it
+// (a settings change, shutdown) closes them too.
+// ─────────────────────────────────────────────────────────────────────────────
+pub async fn serve<D: Decoy>(decoy: Arc<D>, listener: TcpListener, shared: Shared) {
+    let mut sessions = JoinSet::new();
     loop {
-        let (stream, peer) = match listener.accept().await {
+        let accepted = tokio::select! {
+            accepted = listener.accept() => accepted,
+            // Reaps finished sessions so the set holds only open ones.
+            Some(_) = sessions.join_next() => continue,
+        };
+        let (stream, peer) = match accepted {
             Ok(accepted) => accepted,
             Err(e) => {
                 // Usually out of file descriptors. Pausing keeps a flood from
@@ -121,7 +133,7 @@ pub async fn serve<D: Decoy>(decoy: Arc<D>, bind: String, shared: Shared) -> Res
         };
         let decoy = decoy.clone();
         let session = shared.session;
-        tokio::spawn(async move {
+        sessions.spawn(async move {
             let _permit = permit;
             conn.record(conn.event("connect")).await;
             match tokio::time::timeout(session, decoy.handle(conn)).await {

@@ -21,6 +21,7 @@ nav:
   - Home: index.md
   - Documentation:
       - Installation: install.md
+      - The GUI: gui.md
       - Configuration: configuration.md
       - Decoys: decoys.md
       - Events: events.md
@@ -65,6 +66,7 @@ theme:
 
 markdown_extensions:
   - attr_list
+  - def_list
   - md_in_html
   - admonition
   - tables

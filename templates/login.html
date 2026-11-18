@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+{# login.html — the sign-in page and, with `setup`, the first-run page that
+   creates the administrator. Stands alone: no navbar. #}
+<html lang="en" data-bs-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script>try{document.documentElement.setAttribute('data-bs-theme',localStorage.getItem('easydecoy-theme')||'dark')}catch(e){}</script>
+  <title>{% if setup %}Set up{% else %}Sign in{% endif %} — EasyDecoy</title>
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+  <link rel="stylesheet" href="/static/bootstrap.min.css">
+  <link rel="stylesheet" href="/static/bootstrap-icons.css">
+</head>
+<body class="d-flex align-items-center justify-content-center py-4" style="min-height:100vh">
+  <div style="width:380px; max-width:calc(100% - 32px)">
+    {% if gui_warning %}
+    <div class="alert alert-warning small d-flex" role="alert">
+      <i class="bi bi-exclamation-triangle-fill me-2 mt-1"></i><div>{{ gui_warning }}</div>
+    </div>
+    {% endif %}
+    <div class="card shadow-sm">
+      <div class="card-body p-4">
+        <h1 class="h4 text-center mb-1 d-flex align-items-center justify-content-center">
+          <img src="/static/favicon.svg" alt="" width="28" height="28" class="me-2">Easy<span class="text-primary">Decoy</span>
+        </h1>
+        {% if setup %}
+        <p class="text-center text-secondary small mb-4">Create the administrator account.</p>
+        {% else %}
+        <p class="text-center text-secondary small mb-4">Sign in to manage the decoys.</p>
+        {% endif %}
+        {% if signed_out %}
+        <div class="alert alert-secondary py-2 small">You are signed out.</div>
+        {% endif %}
+        {% if error %}
+        <div class="alert alert-danger py-2 small d-flex align-items-center" role="alert">
+          <i class="bi bi-exclamation-triangle-fill me-2"></i>{{ error }}
+        </div>
+        {% endif %}
+        <form method="post" action="{% if setup %}/setup{% else %}/login{% endif %}">
+          <label class="form-label small" for="username">Username</label>
+          <input id="username" name="username" class="form-control mb-3" value="{{ username }}" required
+                 maxlength="64" autocomplete="username" {% if not setup %}autofocus{% endif %}>
+          <label class="form-label small" for="password">Password</label>
+          <input id="password" name="password" type="password" class="form-control mb-3" required
+                 {% if setup %}minlength="{{ min_password }}" autofocus autocomplete="new-password"{% else %}autocomplete="current-password"{% endif %}>
+          {% if setup %}
+          <label class="form-label small" for="confirm">Password again</label>
+          <input id="confirm" name="confirm" type="password" class="form-control mb-1" required
+                 minlength="{{ min_password }}" autocomplete="new-password">
+          <div class="form-text mb-3">At least {{ min_password }} characters.</div>
+          <button class="btn btn-primary w-100" type="submit">Create account</button>
+          {% else %}
+          <button class="btn btn-primary w-100" type="submit">Sign in</button>
+          {% endif %}
+        </form>
+      </div>
+    </div>
+    <p class="text-center text-secondary small mt-3">EasyDecoy v{{ version }}</p>
+  </div>
+</body>
+</html>

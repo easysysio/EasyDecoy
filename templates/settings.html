@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{# settings.html — limits, recording and syslog. #}
+{% block title %}Settings{% endblock %}
+{% block content %}
+<h1 class="h3 mb-4">Settings</h1>
+
+<div class="row g-4">
+  {# ── Limits and recording ───────────────────────────────── #}
+  <div class="col-lg-6">
+    <form class="card h-100" method="post" action="/settings/general">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <div class="card-header fw-semibold"><i class="bi bi-speedometer me-1"></i>Limits and recording</div>
+      <div class="card-body">
+        {% if saved == "general" %}<div class="alert alert-success py-2 small"><i class="bi bi-check-circle me-1"></i>Saved.</div>{% endif %}
+        {% if error_for == "general" %}<div class="alert alert-danger py-2 small"><i class="bi bi-exclamation-triangle me-1"></i>{{ error }}</div>{% endif %}
+        <div class="row g-3 mb-3">
+          <div class="col-sm-4">
+            <label class="form-label small" for="max">Concurrent sessions</label>
+            <input class="form-control" id="max" name="max_connections" value="{{ s.limits.max_connections }}" inputmode="numeric" required>
+          </div>
+          <div class="col-sm-4">
+            <label class="form-label small" for="idle">Idle timeout (s)</label>
+            <input class="form-control" id="idle" name="idle_timeout_secs" value="{{ s.limits.idle_timeout_secs }}" inputmode="numeric" required>
+          </div>
+          <div class="col-sm-4">
+            <label class="form-label small" for="session">Session limit (s)</label>
+            <input class="form-control" id="session" name="session_limit_secs" value="{{ s.limits.session_limit_secs }}" inputmode="numeric" required>
+          </div>
+        </div>
+        <div class="form-text mb-4">
+          Across every decoy; a connection over the limit is closed at once. A client that sends nothing for the idle
+          timeout, or stays longer than the session limit, is disconnected. Changing these restarts the decoys.
+        </div>
+        <label class="form-label small" for="retention">Keep events for (days)</label>
+        <input class="form-control mb-1" id="retention" name="retention_days" value="{{ s.recording.retention_days }}" inputmode="numeric" required style="max-width:10rem">
+        <div class="form-text mb-3">Older events are deleted from the database every hour. 0 keeps them forever.</div>
+        <label class="form-label small" for="events-file">Also write events to</label>
+        <input class="form-control mono mb-1" id="events-file" name="events_file" value="{{ s.recording.events_file }}" placeholder="/var/log/easydecoy/events.jsonl">
+        <div class="form-text">
+          A file every event is appended to as a JSON line, for tools that tail it. Empty writes no file;
+          <span class="mono">-</span> writes to standard output. The database at
+          <span class="mono">{{ db_path }}</span> always has every event.
+        </div>
+      </div>
+      <div class="card-footer text-end">
+        <button class="btn btn-primary btn-sm" type="submit"><i class="bi bi-check-lg me-1"></i>Save</button>
+      </div>
+    </form>
+  </div>
+
+  {# ── Syslog ─────────────────────────────────────────────── #}
+  <div class="col-lg-6">
+    <form class="card h-100" method="post" action="/settings/syslog">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span class="fw-semibold"><i class="bi bi-broadcast me-1"></i>Syslog</span>
+        <div class="form-check form-switch mb-0">
+          <input class="form-check-input" type="checkbox" role="switch" id="syslog-enabled" name="enabled" {% if s.syslog.enabled %}checked{% endif %}>
+          <label class="form-check-label small" for="syslog-enabled">Enabled</label>
+        </div>
+      </div>
+      <div class="card-body">
+        {% if saved == "syslog" %}<div class="alert alert-success py-2 small"><i class="bi bi-check-circle me-1"></i>Saved.</div>{% endif %}
+        {% if error_for == "syslog" %}<div class="alert alert-danger py-2 small"><i class="bi bi-exclamation-triangle me-1"></i>{{ error }}</div>{% endif %}
+        <p class="small text-secondary">
+          Sends every event to a collector (EasyLog, a SIEM, rsyslog) as well. A collector that is down never
+          slows the decoys; the events are still in the database.
+        </p>
+        <label class="form-label small" for="syslog-server">Collector</label>
+        <input class="form-control mono mb-1" id="syslog-server" name="server" value="{{ s.syslog.server }}" required>
+        <div class="form-text mb-3">host:port, e.g. 10.0.0.5:514.</div>
+        <div class="row g-3 mb-3">
+          <div class="col-sm-4">
+            <label class="form-label small" for="syslog-protocol">Protocol</label>
+            <select class="form-select" id="syslog-protocol" name="protocol">
+              <option value="udp" {% if s.syslog.protocol == "udp" %}selected{% endif %}>UDP</option>
+              <option value="tcp" {% if s.syslog.protocol == "tcp" %}selected{% endif %}>TCP</option>
+            </select>
+          </div>
+          <div class="col-sm-4">
+            <label class="form-label small" for="syslog-format">Format</label>
+            <select class="form-select" id="syslog-format" name="format">
+              <option value="rfc5424" {% if s.syslog.format == "rfc5424" %}selected{% endif %}>RFC 5424</option>
+              <option value="rfc3164" {% if s.syslog.format == "rfc3164" %}selected{% endif %}>RFC 3164 (BSD)</option>
+            </select>
+          </div>
+          <div class="col-sm-4">
+            <label class="form-label small" for="syslog-facility">Facility</label>
+            <select class="form-select" id="syslog-facility" name="facility">
+              {% for f in facilities %}
+              <option value="{{ f }}" {% if s.syslog.facility == f %}selected{% endif %}>{{ f }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+        <label class="form-label small" for="syslog-hostname">Hostname</label>
+        <input class="form-control mb-1" id="syslog-hostname" name="hostname" value="{{ s.syslog.hostname }}" maxlength="255" placeholder="this machine's name">
+        <div class="form-text">The HOSTNAME field of each message. Empty uses this machine's name.</div>
+      </div>
+      <div class="card-footer text-end">
+        <button class="btn btn-primary btn-sm" type="submit"><i class="bi bi-check-lg me-1"></i>Save syslog</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

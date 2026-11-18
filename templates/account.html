@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{# account.html — the password, and the audit trail of what was done in the GUI. #}
+{% block title %}Account{% endblock %}
+{% block content %}
+<h1 class="h3 mb-4">Account</h1>
+
+<div class="row g-4">
+  <div class="col-lg-5">
+    <form class="card" method="post" action="/account/password">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <input type="hidden" name="username" value="{{ user }}" autocomplete="username">
+      <div class="card-header fw-semibold"><i class="bi bi-key me-1"></i>Change password</div>
+      <div class="card-body">
+        {% if saved %}<div class="alert alert-success py-2 small"><i class="bi bi-check-circle me-1"></i>Password changed. Every other browser signed in as {{ user }} was signed out.</div>{% endif %}
+        {% if error %}<div class="alert alert-danger py-2 small"><i class="bi bi-exclamation-triangle me-1"></i>{{ error }}</div>{% endif %}
+        <label class="form-label small" for="current">Current password</label>
+        <input class="form-control mb-3" type="password" id="current" name="current" required autocomplete="current-password">
+        <label class="form-label small" for="password">New password</label>
+        <input class="form-control mb-3" type="password" id="password" name="password" required minlength="{{ min_password }}" autocomplete="new-password">
+        <label class="form-label small" for="confirm">New password again</label>
+        <input class="form-control mb-1" type="password" id="confirm" name="confirm" required minlength="{{ min_password }}" autocomplete="new-password">
+        <div class="form-text">At least {{ min_password }} characters.</div>
+      </div>
+      <div class="card-footer text-end">
+        <button class="btn btn-primary btn-sm" type="submit">Change password</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="col-lg-7">
+    <div class="card">
+      <div class="card-header fw-semibold"><i class="bi bi-journal-text me-1"></i>Activity</div>
+      {% if audit | length == 0 %}
+      <div class="card-body text-secondary small">Nothing yet.</div>
+      {% else %}
+      <div class="table-responsive" style="max-height:32rem">
+        <table class="table table-sm mb-0">
+          <thead class="sticky-top"><tr><th class="ps-3">Time</th><th>Who</th><th>From</th><th>What</th></tr></thead>
+          <tbody>
+          {% for a in audit %}
+            <tr>
+              <td class="text-nowrap small ps-3"><span data-utc="{{ a.time }}" data-style="short">{{ a.time }}</span></td>
+              <td class="small">{{ a.username }}</td>
+              <td class="mono small">{{ a.client_ip }}</td>
+              <td class="small">
+                <span class="{% if a.action is starting_with('sign_in_') %}text-danger-emphasis{% endif %}">{{ a.action | replace(from="_", to=" ") }}</span>
+                {% if a.detail %}<div class="mono text-secondary text-break" style="font-size:.75rem">{{ a.detail }}</div>{% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

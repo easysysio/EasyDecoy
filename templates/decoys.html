@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{# decoys.html — each decoy's status and settings. A save restarts only that
+   decoy. #}
+{% block title %}Decoys{% endblock %}
+{% macro status_line(d) %}
+  {% if d.state == "running" %}
+  <span class="badge text-bg-success"><i class="bi bi-circle-fill me-1 small"></i>Running</span>
+  <span class="small text-secondary ms-1">on <span class="mono">{{ d.detail }}</span></span>
+  {% elif d.state == "failed" %}
+  <span class="badge text-bg-danger"><i class="bi bi-x-circle me-1"></i>Not running</span>
+  <div class="small text-danger-emphasis mt-1">{{ d.detail }}. EasyDecoy tries again every 30 seconds.</div>
+  {% elif d.state == "starting" %}<span class="badge text-bg-secondary">Starting</span>
+  {% else %}<span class="badge text-bg-secondary">Off</span>{% endif %}
+{% endmacro %}
+
+{% block content %}
+
+<h1 class="h3 mb-1">Decoys</h1>
+<p class="text-secondary mb-4">
+  Fake services that answer like real ones. Nothing a client sends is ever run or passed to this host,
+  and passwords are never stored, only their length. The GUI's own address
+  (<span class="mono">{{ gui }}</span>) can't be given to a decoy.
+</p>
+
+<div class="row g-4">
+  {# ── Telnet ─────────────────────────────────────────────── #}
+  <div class="col-lg-6">
+    <form class="card h-100" method="post" action="/decoys/telnet">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span class="fw-semibold"><i class="bi bi-terminal me-1"></i>Telnet</span>
+        <div class="form-check form-switch mb-0">
+          <input class="form-check-input" type="checkbox" role="switch" id="telnet-enabled" name="enabled" {% if s.telnet.enabled %}checked{% endif %}>
+          <label class="form-check-label small" for="telnet-enabled">Enabled</label>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="mb-3">{{ self::status_line(d=decoys.0) }}</div>
+        {% if saved == "telnet" %}<div class="alert alert-success py-2 small"><i class="bi bi-check-circle me-1"></i>Saved.</div>{% endif %}
+        {% if error_for == "telnet" %}<div class="alert alert-danger py-2 small"><i class="bi bi-exclamation-triangle me-1"></i>{{ error }}</div>{% endif %}
+        <p class="small text-secondary">A login prompt that never accepts a login. Every username tried is recorded.</p>
+        <label class="form-label small" for="telnet-bind">Listen on</label>
+        <input class="form-control mono mb-1" id="telnet-bind" name="bind" value="{{ s.telnet.bind }}" required>
+        <div class="form-text mb-3">ip:port. Ports below 1024 (such as 23) work under the systemd service.</div>
+        <label class="form-label small" for="telnet-banner">Banner</label>
+        <input class="form-control mb-1" id="telnet-banner" name="banner" value="{{ s.telnet.banner }}" maxlength="200">
+        <div class="form-text mb-3">Shown when a client connects, as a real host shows /etc/issue.net.</div>
+        <label class="form-label small" for="telnet-hostname">Hostname</label>
+        <input class="form-control mb-1" id="telnet-hostname" name="hostname" value="{{ s.telnet.hostname }}" required maxlength="64">
+        <div class="form-text">In the prompt: <span class="mono">{{ s.telnet.hostname }} login:</span></div>
+      </div>
+      <div class="card-footer text-end">
+        <button class="btn btn-primary btn-sm" type="submit"><i class="bi bi-check-lg me-1"></i>Save Telnet</button>
+      </div>
+    </form>
+  </div>
+
+  {# ── HTTP ───────────────────────────────────────────────── #}
+  <div class="col-lg-6">
+    <form class="card h-100" method="post" action="/decoys/http">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span class="fw-semibold"><i class="bi bi-globe2 me-1"></i>HTTP</span>
+        <div class="form-check form-switch mb-0">
+          <input class="form-check-input" type="checkbox" role="switch" id="http-enabled" name="enabled" {% if s.http.enabled %}checked{% endif %}>
+          <label class="form-check-label small" for="http-enabled">Enabled</label>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="mb-3">{{ self::status_line(d=decoys.1) }}</div>
+        {% if saved == "http" %}<div class="alert alert-success py-2 small"><i class="bi bi-check-circle me-1"></i>Saved.</div>{% endif %}
+        {% if error_for == "http" %}<div class="alert alert-danger py-2 small"><i class="bi bi-exclamation-triangle me-1"></i>{{ error }}</div>{% endif %}
+        <p class="small text-secondary">A web administration sign-in page. Every request and sign-in attempt is recorded.</p>
+        <label class="form-label small" for="http-bind">Listen on</label>
+        <input class="form-control mono mb-1" id="http-bind" name="bind" value="{{ s.http.bind }}" required>
+        <div class="form-text mb-3">ip:port, plain HTTP. Port 80 works under the systemd service.</div>
+        <label class="form-label small" for="http-server">Server header</label>
+        <input class="form-control mb-1" id="http-server" name="server_header" value="{{ s.http.server_header }}" maxlength="128">
+        <div class="form-text mb-3">What the decoy claims to be. Empty sends no Server header.</div>
+        <label class="form-label small" for="http-title">Page title</label>
+        <input class="form-control" id="http-title" name="title" value="{{ s.http.title }}" required maxlength="128">
+      </div>
+      <div class="card-footer text-end">
+        <button class="btn btn-primary btn-sm" type="submit"><i class="bi bi-check-lg me-1"></i>Save HTTP</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

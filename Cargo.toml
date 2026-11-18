@@ -1,6 +1,6 @@
 [package]
 name = "easydecoy"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 authors = ["Yariv Hakim"]
 description = "EasyDecoy - decoy network services that detect intruders"
@@ -21,7 +21,7 @@ tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "io-uti
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
-# Serialisation: TOML config in, JSON events out
+# Serialisation: TOML config in, JSON events and stored settings out
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 toml = "0.8"
@@ -29,8 +29,38 @@ toml = "0.8"
 # Error handling
 anyhow = "1"
 
-# Event timestamps
-chrono = { version = "0.4", features = ["serde"] }
+# Event timestamps. `time` rather than chrono (unmaintained, RUSTSEC-2026-0543);
+# cookies and the GUI certificate already use it.
+time = { version = "0.3.47", features = ["formatting", "macros"] }
+
+# Database: settings, events, accounts and the audit trail, in one SQLite file.
+# The schema is in migrations/, compiled in and applied at startup.
+sqlx = { version = "0.9", default-features = false, features = ["sqlite-bundled", "runtime-tokio", "macros", "migrate"] }
+
+# Management GUI. Pages are Tera templates and Bootstrap, compiled into the
+# binary, so the GUI needs nothing on disk.
+axum = "0.8"
+axum-extra = { version = "0.10", features = ["cookie"] }
+# Only the urlencode filters: the default builtins pull in chrono and
+# chrono-tz (unmaintained) for date filters the templates don't use.
+tera = { version = "1.20", default-features = false, features = ["urlencode"] }
+# Streaming an events export page by page rather than holding it in memory.
+futures = "0.3"
+# The GUI is only ever served over TLS. tls-rustls-no-provider, as in EasyWAF:
+# ring is chosen explicitly at startup, which keeps aws-lc-rs and its C build
+# out of the tree. 0.23.45 at least (RUSTSEC-2026-0285).
+axum-server = { version = "0.8", features = ["tls-rustls-no-provider"] }
+rustls = { version = "0.23.45", default-features = false, features = ["ring", "std", "tls12", "logging"] }
+# The self-signed certificate made on first run.
+rcgen = "0.13"
+# Passwords (bcrypt), session tokens (random, stored as SHA-256).
+bcrypt = "0.17"
+rand = "0.8"
+sha2 = "0.10"
+
+[dev-dependencies]
+# Driving the GUI's router in tests without a socket.
+tower = { version = "0.5", features = ["util"] }
 
 # ─── Debian package (.deb) — cargo-deb ──────────────────────
 # Built natively per architecture in CI (.github/workflows/release.yml). The
@@ -50,7 +80,8 @@ maintainer-scripts = "packaging/deb"
 extended-description = """\
 EasyDecoy runs decoy network services: a Telnet login and a web admin panel
 that look real but lead nowhere. Nobody legitimate has a reason to connect to
-them, so every connection is recorded as a JSON event worth a look."""
+them, so every connection is recorded as an event worth a look, and shown in
+a web management GUI."""
 assets = [
     ["target/release/easydecoy",   "usr/bin/",                                "755"],
     ["packaging/easydecoy.toml",   "usr/share/easydecoy/easydecoy.toml",      "644"],

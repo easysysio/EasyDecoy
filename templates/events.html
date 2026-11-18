@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{# events.html — every event, filtered and paged, newest first. A row opens
+   to show every field the event recorded. #}
+{% block title %}Events{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+  <h1 class="h3 mb-0">Events <span class="text-secondary fs-6 fw-normal">{{ total }} {% if filtered %}matching{% endif %}</span></h1>
+  <a class="btn btn-sm btn-outline-secondary" href="{{ export_url }}">
+    <i class="bi bi-download me-1"></i>Export {% if filtered %}these{% else %}all{% endif %} (JSON lines)</a>
+</div>
+
+<form class="row g-2 mb-3" method="get" action="/events">
+  <div class="col-6 col-md-2">
+    <select class="form-select form-select-sm" name="decoy" aria-label="Decoy">
+      <option value="">Every decoy</option>
+      {% for d in ["telnet", "http"] %}
+      <option value="{{ d }}" {% if filter.decoy == d %}selected{% endif %}>{{ d }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="col-6 col-md-2">
+    <select class="form-select form-select-sm" name="kind" aria-label="Event">
+      <option value="">Every event</option>
+      {% for k in kinds %}
+      <option value="{{ k }}" {% if filter.kind == k %}selected{% endif %}>{{ k }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="col-6 col-md-3">
+    <input class="form-control form-control-sm mono" name="src" value="{{ filter.src }}" placeholder="Source address" aria-label="Source address">
+  </div>
+  <div class="col-6 col-md-3">
+    <input class="form-control form-control-sm" name="q" value="{{ filter.q }}" placeholder="Search (username, path…)" aria-label="Search">
+  </div>
+  <div class="col-12 col-md-2 d-flex gap-2">
+    <button class="btn btn-sm btn-primary flex-fill" type="submit"><i class="bi bi-funnel me-1"></i>Filter</button>
+    {% if filtered %}<a class="btn btn-sm btn-outline-secondary" href="/events" title="Clear"><i class="bi bi-x-lg"></i></a>{% endif %}
+  </div>
+</form>
+
+{% if rows | length == 0 %}
+<div class="card"><div class="card-body text-secondary">
+  {% if filtered %}No event matches.{% else %}No events yet. Every connection to a decoy will be listed here.{% endif %}
+</div></div>
+{% else %}
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-sm table-hover mb-0">
+      <thead><tr><th class="ps-3">Time</th><th>Decoy</th><th>Event</th><th>Source</th><th>Port</th><th>What</th></tr></thead>
+      <tbody>
+      {% for e in rows %}
+        <tr data-bs-toggle="collapse" data-bs-target="#ev{{ e.id }}" style="cursor:pointer" aria-expanded="false">
+          <td class="text-nowrap small ps-3"><span data-utc="{{ e.time }}">{{ e.time }}</span></td>
+          <td>{{ e.decoy }}</td>
+          <td><span class="badge {% if e.kind == 'login_attempt' %}text-bg-danger{% elif e.kind == 'connect' %}text-bg-secondary{% else %}text-bg-info{% endif %}">{{ e.kind }}</span></td>
+          <td class="mono">{{ e.src_ip }}</td>
+          <td class="mono">{{ e.dst_port }}</td>
+          <td class="truncate mono" style="width:40%" title="{{ e.summary }}">{{ e.summary }}</td>
+        </tr>
+        <tr class="collapse" id="ev{{ e.id }}">
+          <td colspan="6" class="ps-3 bg-body-tertiary">
+            <dl class="row event-details small mb-0 py-1">
+              <dt class="col-sm-3">source</dt>
+              <dd class="col-sm-9">{{ e.src_ip }}:{{ e.src_port }}
+                · <a href="/events?src={{ e.src_ip | urlencode_strict }}">every event from it</a></dd>
+              {% for d in e.details %}
+              <dt class="col-sm-3">{{ d.0 }}</dt><dd class="col-sm-9">{{ d.1 }}</dd>
+              {% endfor %}
+            </dl>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+<nav class="d-flex justify-content-between align-items-center mt-3" aria-label="Pages">
+  {% if prev_url %}<a class="btn btn-sm btn-outline-secondary" href="{{ prev_url }}"><i class="bi bi-chevron-left"></i> Newer</a>{% else %}<span></span>{% endif %}
+  <span class="small text-secondary">Page {{ page }} of {{ pages }}</span>
+  {% if next_url %}<a class="btn btn-sm btn-outline-secondary" href="{{ next_url }}">Older <i class="bi bi-chevron-right"></i></a>{% else %}<span></span>{% endif %}
+</nav>
+{% endif %}
+{% endblock %}

@@ -17,7 +17,11 @@
 #
 # A first install starts nothing: the decoys go live when an
 # administrator enables them (systemctl enable --now
-# easydecoy), after looking at the config.
+# easydecoy). They are then set up in the management GUI,
+# on this machine only (127.0.0.1:9443), through an SSH
+# tunnel. An upgrade from 0.1.0 keeps its config file: its
+# decoy and syslog settings move into the database on the
+# first start of 0.2.0.
 #
 # Safe to run by hand, as root.
 # =========================================================
@@ -49,7 +53,8 @@ if ! getent passwd "$ACCOUNT" >/dev/null 2>&1; then
     shell=/usr/sbin/nologin
     [ -x "$shell" ] || shell=/sbin/nologin
     [ -x "$shell" ] || shell=/bin/false
-    # Nothing to keep at home: everything it writes goes to /var/log/easydecoy.
+    # Nothing to keep at home: what it writes goes to /var/lib/easydecoy
+    # and /var/log/easydecoy, which systemd makes for it.
     useradd --system --gid "$ACCOUNT" --home-dir /nonexistent --no-create-home \
             --shell "$shell" --comment "EasyDecoy" "$ACCOUNT" \
         || fail "could not create the account '$ACCOUNT'"
@@ -63,6 +68,9 @@ if [ ! -e "$CONFIG" ] && [ -e "$DEFAULT" ]; then
     cp "$DEFAULT" "$CONFIG"
     chmod 644 "$CONFIG"
     echo "easydecoy: installed the default config at $CONFIG"
+    echo "easydecoy: start it with: systemctl enable --now easydecoy"
+    echo "easydecoy: then, from your computer: ssh -L 9443:127.0.0.1:9443 <this host>"
+    echo "easydecoy: and open https://localhost:9443/ to create the admin account"
 fi
 
 # ── 3. Bring a running service onto the new binary ───────
