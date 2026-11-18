@@ -391,6 +391,20 @@ impl SettingsStore {
         Ok((Self { db, tx: Arc::new(tx), saving: Arc::new(Mutex::new(())) }, empty))
     }
 
+    // ─────────────────────────────────────────────────────────────────────────
+    // has_section(section)
+    // Whether the database has a row for it. A database from before a section
+    // existed doesn't, and its settings are the defaults.
+    // ─────────────────────────────────────────────────────────────────────────
+    pub async fn has_section(&self, section: &str) -> Result<bool> {
+        let row: Option<(i64,)> = sqlx::query_as("SELECT 1 FROM settings WHERE section = ?")
+            .bind(section)
+            .fetch_optional(&self.db)
+            .await
+            .context("reading settings")?;
+        Ok(row.is_some())
+    }
+
     pub fn current(&self) -> Arc<Settings> {
         self.tx.borrow().clone()
     }
@@ -528,6 +542,8 @@ mod tests {
             .await
             .unwrap();
         let (store, _) = SettingsStore::load(db).await.unwrap();
+        assert!(store.has_section("telnet").await.unwrap());
+        assert!(!store.has_section("ssh").await.unwrap());
         let s = store.current();
         assert_eq!(s.telnet.hostname, "fs1");
         assert_eq!(s.telnet.bind, TelnetSettings::default().bind);

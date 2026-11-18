@@ -38,6 +38,10 @@ const DEFAULT_CONFIG: &str = "config/easydecoy.toml";
 // How long events still queued at shutdown get to reach the database.
 const DRAIN: Duration = Duration::from_secs(5);
 
+// Where the packaged service puts the decoys added after 0.1.0.
+const PACKAGED_FTP_BIND: &str = "0.0.0.0:21";
+const PACKAGED_SSH_BIND: &str = "0.0.0.0:22";
+
 // What --help prints.
 const USAGE: &str = "\
 Usage: easydecoy [--help | --version]
@@ -181,6 +185,11 @@ async fn main() -> Result<()> {
 // On an empty database, stores the first settings: a 0.1.0 config file's, or
 // the defaults. After that, any 0.1.0 settings left in the file are ignored,
 // and the log says so once per start.
+//
+// As the packaged service, the decoys take the real ports. That includes a
+// decoy newer than the settings being upgraded: FTP after a 0.1.0 import, SSH
+// on a 0.2.0 database. Those stay off, but turning one on puts it on the port
+// the docs and its card say, not the source run's.
 // ─────────────────────────────────────────────────────────────────────────────
 async fn first_start(
     settings: &SettingsStore,
@@ -189,6 +198,8 @@ async fn first_start(
     gui: std::net::SocketAddr,
     path: &str,
 ) -> Result<()> {
+    // systemd gives the packaged unit a state directory.
+    let packaged = std::env::var_os("STATE_DIRECTORY").is_some();
     let legacy = config.legacy();
     if !empty {
         if legacy.is_some() {
@@ -197,29 +208,40 @@ async fn first_start(
                  first start and are now ignored. Change them in the GUI, and remove them from the file."
             );
         }
+        // 0.2.0 had no SSH decoy, so its database has no ssh row.
+        if packaged && !settings.has_section("ssh").await? {
+            let mut upgraded = (*settings.current()).clone();
+            upgraded.ssh.bind = PACKAGED_SSH_BIND.to_string();
+            tracing::info!("upgrade: the new SSH decoy is set up on {PACKAGED_SSH_BIND}, off until it is turned on");
+            settings.save(upgraded).await.context("storing the SSH decoy's settings")?;
+        }
         return Ok(());
     }
     let first = match legacy {
-        Some(imported) => {
+        Some(mut imported) => {
             match imported.check(gui) {
                 Ok(()) => tracing::info!("first start: imported the decoy, syslog and limit settings from {path}"),
                 // Stored anyway: the GUI is where they get fixed, and a decoy
                 // that can't start says why there.
                 Err(problem) => tracing::warn!("first start: imported the settings from {path}, but: {problem}"),
             }
+            // 0.1.0 had neither; both stay off (see Config::legacy).
+            if packaged {
+                imported.ftp.bind = PACKAGED_FTP_BIND.to_string();
+                imported.ssh.bind = PACKAGED_SSH_BIND.to_string();
+            }
             imported
         }
         None => {
             let mut defaults = Settings::default();
-            // As the packaged service (systemd gives it a state directory),
-            // the decoys take the real ports, as 0.1.0's package did. One
-            // that is taken shows as not running in the GUI.
-            if std::env::var_os("STATE_DIRECTORY").is_some() {
+            // As 0.1.0's package did. A port that is taken shows as not
+            // running in the GUI.
+            if packaged {
                 defaults.telnet.bind = "0.0.0.0:23".to_string();
                 defaults.http.bind = "0.0.0.0:80".to_string();
-                defaults.ftp.bind = "0.0.0.0:21".to_string();
+                defaults.ftp.bind = PACKAGED_FTP_BIND.to_string();
                 // Off until it is turned on: the host's own sshd has port 22.
-                defaults.ssh.bind = "0.0.0.0:22".to_string();
+                defaults.ssh.bind = PACKAGED_SSH_BIND.to_string();
             }
             tracing::info!(
                 "first start: default settings (Telnet on {}, HTTP on {}, FTP on {})",
