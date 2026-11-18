@@ -206,6 +206,7 @@ protocol = "tcp"
         assert_eq!(s.telnet.banner, "Ubuntu 22.04.4 LTS");
         assert!(!s.http.enabled);
         assert!(!s.ftp.enabled, "0.1.0 had no FTP decoy");
+        assert!(!s.ssh.enabled, "nor an SSH one");
         assert_eq!(s.syslog.protocol, SyslogProtocol::Tcp);
         // An empty events_file was stdout in 0.1.0, and stays stdout.
         let stdout: Config = toml::from_str("events_file = \"\"\n").unwrap();

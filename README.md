@@ -2,9 +2,9 @@
 
 HoneyPot for your network.
 
-EasyDecoy runs decoy network services: a Telnet login, a web admin panel and
-an FTP server that look real but lead nowhere. Nobody legitimate has a reason to connect to
-them, so every connection is worth a look. Each one is recorded as a JSON
+EasyDecoy runs decoy network services: a Telnet login, a web admin panel, an
+FTP server and an SSH server that look real but lead nowhere. Nobody
+legitimate has a reason to connect to them, so every connection is worth a look. Each one is recorded as a JSON
 event.
 
 The decoys are low-interaction: they imitate a service's prompts and replies,
@@ -31,7 +31,10 @@ ssh -L 9443:127.0.0.1:9443 decoy-host
 ```
 
 then open <https://localhost:9443/> and create the admin account. The packaged
-service puts the decoys on the real ports (23, 80 and 21). It runs as its own
+service puts the decoys on the real ports (23, 80 and 21). The SSH decoy is
+set up on 22 but starts off, since that is normally the host's own sshd: move
+sshd to another port first, as
+[the docs](https://easydecoy.easysys.io/decoys/#port-22) describe. It runs as its own
 unprivileged `easydecoy` account, with only the capability to bind ports below
 1024. An upgrade keeps your settings and restarts a running service; an
 upgrade from 0.1.0 moves the settings in its config file into the database.
@@ -44,12 +47,14 @@ cargo run
 
 Open <https://127.0.0.1:9443/>, create the account, and knock from another
 terminal. The decoys listen on `0.0.0.0:2323` (Telnet), `0.0.0.0:8080`
-(HTTP) and `0.0.0.0:2121` (FTP):
+(HTTP) and `0.0.0.0:2121` (FTP), and on `0.0.0.0:2222` (SSH) once you turn it
+on under **Decoys**:
 
 ```sh
 telnet localhost 2323
 curl -d 'username=admin&password=x' http://localhost:8080/login
 curl ftp://admin:x@localhost:2121/
+ssh -p 2222 admin@localhost
 ```
 
 ## The GUI
@@ -58,8 +63,8 @@ curl ftp://admin:x@localhost:2121/
   days, a timeline, the top sources, usernames and paths, and each decoy's state.
 - **Events**: every event, filtered by decoy, kind, source or text, and
   exported as JSON lines.
-- **Decoys**: Telnet, HTTP and FTP: ports, banners, hostname, Server header,
-  page title. A save restarts that decoy, with no service restart.
+- **Decoys**: Telnet, HTTP, FTP and SSH: ports, banners, hostname, Server
+  header, page title, SSH version. A save restarts that decoy, with no service restart.
 - **Settings**: limits, retention, an optional events file, syslog.
 - **Account**: password, and an audit log of every sign-in and change.
 
@@ -83,6 +88,8 @@ One JSON object per line:
 | `http`   | `non_http`      | `sample`: the start of what the client sent           |
 | `ftp`    | `login_attempt` | `username`, `password_length`                         |
 | `ftp`    | `command`       | `command`, `argument`: sent without a login           |
+| `ssh`    | `handshake`     | `client`: the client's version line                   |
+| `ssh`    | `login_attempt` | `username`, `method`, `client`, and `password_length` or `key_type`, `key_fingerprint` |
 
 ## Syslog
 

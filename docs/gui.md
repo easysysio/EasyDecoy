@@ -9,7 +9,8 @@ machine, tunnel to it:
 ssh -L 9443:127.0.0.1:9443 decoy-host
 ```
 
-and open **https://localhost:9443/**.
+and open **https://localhost:9443/**. If you gave port 22 to the
+[SSH decoy](decoys.md#port-22), add the real sshd's port, as `-p 2222`.
 
 ## First visit
 
@@ -35,7 +36,8 @@ first account by getting there after you.
     they are stored, for `jq` or another tool.
 
 **Decoys**
-:   Each decoy's state and settings: Telnet, HTTP and FTP. A decoy that
+:   Each decoy's state and settings: Telnet, HTTP, FTP and SSH, with the SSH
+    decoy's host key fingerprint. A decoy that
     couldn't start, usually because its port is in use, says **Not running**
     and why. EasyDecoy tries
     it again every 30 seconds, or as soon as you save it.

@@ -22,7 +22,7 @@ Each event can also go, as the same JSON line, to:
 | Field | What it is |
 |---|---|
 | `time` | When it happened: UTC, RFC 3339, always to the microsecond |
-| `decoy` | `telnet`, `http` or `ftp` |
+| `decoy` | `telnet`, `http`, `ftp` or `ssh` |
 | `kind` | What happened; see below |
 | `src_ip` | The client's address. An IPv4 client of a dual-stack listener is shown as plain IPv4. |
 | `src_port` | The client's port |
@@ -39,6 +39,8 @@ Each event can also go, as the same JSON line, to:
 | `non_http` | `http` | `sample`: the first 64 bytes the client sent |
 | `login_attempt` | `ftp` | `username`, `password_length` |
 | `command` | `ftp` | `command`, and `argument` when there is one: a command sent without a login that an ordinary client wouldn't send |
+| `handshake` | `ssh` | `client`: the version line the client sent, such as `SSH-2.0-OpenSSH_9.6` |
+| `login_attempt` | `ssh` | `username`, `method` and `client`; with `method` `password`, the `password_length`; with `publickey`, the `key_type` (such as `ssh-ed25519`) and the `key_fingerprint` (`SHA256:...`) |
 
 A field the client didn't send, such as a request with no `User-Agent`, is
 left out rather than recorded as empty.
@@ -57,7 +59,8 @@ it is written:
 - Control characters, including newlines and terminal escapes, become `.`,
   so a client cannot forge a log line or recolour your terminal.
 - Each field is cut to a fixed length: `method` and `command` 16 characters,
-  `username` 128, `host`, `user_agent` and `argument` 256, `path` 512.
+  `username` 128, `host`, `user_agent` and `argument` 256, `client` 255,
+  `path` 512.
 
 ## Reading events with jq
 
@@ -80,6 +83,13 @@ Which usernames are being tried:
 ```bash
 jq -r 'select(.username) | .username' easydecoy-events.jsonl \
   | sort | uniq -c | sort -rn
+```
+
+The SSH keys offered, and from where:
+
+```bash
+jq -r 'select(.key_fingerprint) | "\(.key_fingerprint) \(.src_ip)"' \
+  easydecoy-events.jsonl | sort | uniq -c | sort -rn
 ```
 
 What scanners asked the web decoy for:

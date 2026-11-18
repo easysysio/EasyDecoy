@@ -1,7 +1,7 @@
 // =============================================================================
 // supervisor.rs — keeps the decoys running as the settings say
 //
-// Each enabled decoy (Telnet, HTTP, FTP) runs in its own task. When a decoy's settings change in
+// Each enabled decoy (Telnet, HTTP, FTP, SSH) runs in its own task. When a decoy's settings change in
 // the GUI, only that decoy is restarted (its listener closed and opened again,
 // its open sessions ended); a change to the limits restarts them all, since
 // they share one session limit.
@@ -16,11 +16,13 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use serde::Serialize;
+use russh::keys::PrivateKey;
 use tokio::sync::Semaphore;
 use tokio::task::JoinHandle;
 
 use crate::decoy::ftp::Ftp;
 use crate::decoy::http::Http;
+use crate::decoy::ssh::Ssh;
 use crate::decoy::telnet::Telnet;
 use crate::decoy::{self, Decoy, Shared};
 use crate::event::EventTx;
@@ -65,12 +67,12 @@ impl Drop for Task {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// spawn(settings, events)
+// spawn(settings, events, host_key)
 // Starts every enabled decoy and the task that keeps them in line with the
-// settings. Stopping (aborting) the returned task stops every decoy and every
+// settings. `host_key` is the SSH decoy's (decoy::ssh::host_key). Stopping (aborting) the returned task stops every decoy and every
 // open session.
 // ─────────────────────────────────────────────────────────────────────────────
-pub fn spawn(settings: SettingsStore, events: EventTx) -> (StatusMap, JoinHandle<()>) {
+pub fn spawn(settings: SettingsStore, events: EventTx, host_key: PrivateKey) -> (StatusMap, JoinHandle<()>) {
     let status = StatusMap::default();
     let map = status.clone();
     let handle = tokio::spawn(async move {
@@ -80,6 +82,7 @@ pub fn spawn(settings: SettingsStore, events: EventTx) -> (StatusMap, JoinHandle
         let mut telnet = start_telnet(&s, &shared, &map);
         let mut http = start_http(&s, &shared, &map);
         let mut ftp = start_ftp(&s, &shared, &map);
+        let mut ssh = start_ssh(&s, &shared, &map, &host_key);
 
         while watch.changed().await.is_ok() {
             let new = watch.borrow_and_update().clone();
@@ -100,11 +103,15 @@ pub fn spawn(settings: SettingsStore, events: EventTx) -> (StatusMap, JoinHandle
                 drop(ftp.take());
                 ftp = start_ftp(&new, &shared, &map);
             }
+            if limits || new.ssh != s.ssh {
+                drop(ssh.take());
+                ssh = start_ssh(&new, &shared, &map, &host_key);
+            }
             s = new;
         }
         // The settings store is gone: keep the decoys as they are.
         std::future::pending::<()>().await;
-        drop((telnet, http, ftp));
+        drop((telnet, http, ftp, ssh));
     });
     (status, handle)
 }
@@ -131,6 +138,11 @@ fn start_http(s: &Settings, shared: &Shared, status: &StatusMap) -> Option<Task>
 fn start_ftp(s: &Settings, shared: &Shared, status: &StatusMap) -> Option<Task> {
     let f = &s.ftp;
     start(f.enabled, Ftp::new(f), &f.bind, shared, status)
+}
+
+fn start_ssh(s: &Settings, shared: &Shared, status: &StatusMap, host_key: &PrivateKey) -> Option<Task> {
+    let h = &s.ssh;
+    start(h.enabled, Ssh::new(h, host_key.clone(), shared.idle), &h.bind, shared, status)
 }
 
 fn start<D: Decoy>(enabled: bool, decoy: D, bind: &str, shared: &Shared, status: &StatusMap) -> Option<Task> {
@@ -183,15 +195,20 @@ mod tests {
         s.telnet.bind = "127.0.0.1:0".into();
         s.http.enabled = false;
         s.ftp.bind = "127.0.0.1:0".into();
+        s.ssh.enabled = true;
+        s.ssh.bind = "127.0.0.1:0".into();
         store.save(s.clone()).await.unwrap();
 
+        let key = crate::decoy::ssh::host_key(&db).await.unwrap();
         let (events, _writer) = crate::event::spawn_writer(db, store.clone()).await;
-        let (status, task) = spawn(store.clone(), events);
+        let (status, task) = spawn(store.clone(), events, key);
         let running = wait_for(&status, "telnet", |s| matches!(s, Status::Running(_))).await;
         assert_eq!(running, Status::Running("127.0.0.1:0".into()));
         assert_eq!(status.get("http"), Status::Disabled);
         let ftp = wait_for(&status, "ftp", |s| matches!(s, Status::Running(_))).await;
         assert_eq!(ftp, Status::Running("127.0.0.1:0".into()));
+        let ssh = wait_for(&status, "ssh", |s| matches!(s, Status::Running(_))).await;
+        assert_eq!(ssh, Status::Running("127.0.0.1:0".into()));
 
         // A bind that can't work is reported, not fatal.
         s.telnet.bind = "192.0.2.1:2323".into();

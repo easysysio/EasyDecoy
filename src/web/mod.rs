@@ -48,6 +48,8 @@ pub struct AppState {
     pub gui: SocketAddr,
     /// The database file, shown on the settings page.
     pub db_file: String,
+    /// The SSH decoy's host key fingerprint, shown on the decoys page.
+    pub ssh_fingerprint: String,
     tera: Arc<Tera>,
     limiter: Arc<auth::Limiter>,
 }
@@ -59,6 +61,7 @@ impl AppState {
         status: StatusMap,
         gui: SocketAddr,
         db_file: String,
+        ssh_fingerprint: String,
     ) -> Result<Self> {
         Ok(Self {
             db,
@@ -66,6 +69,7 @@ impl AppState {
             status,
             gui,
             db_file,
+            ssh_fingerprint,
             tera: Arc::new(templates()?),
             limiter: Arc::new(auth::Limiter::default()),
         })
@@ -116,6 +120,7 @@ pub fn gui_warning(gui: SocketAddr, settings: &Settings) -> Option<String> {
         (settings.telnet.enabled, &settings.telnet.bind),
         (settings.http.enabled, &settings.http.bind),
         (settings.ftp.enabled, &settings.ftp.bind),
+        (settings.ssh.enabled, &settings.ssh.bind),
     ];
     let shared = decoys.iter().any(|(enabled, bind)| {
         *enabled && bind.trim().parse::<SocketAddr>().is_ok_and(|b| b.ip() == ip || b.ip().is_unspecified())
@@ -141,6 +146,7 @@ pub fn router(state: AppState) -> Router {
         .route("/decoys/telnet", post(pages::save_telnet))
         .route("/decoys/http", post(pages::save_http))
         .route("/decoys/ftp", post(pages::save_ftp))
+        .route("/decoys/ssh", post(pages::save_ssh))
         .route("/settings", get(pages::settings))
         .route("/settings/general", post(pages::save_general))
         .route("/settings/syslog", post(pages::save_syslog))
@@ -291,6 +297,9 @@ mod tests {
         s.ftp.bind = "203.0.113.5:21".into();
         assert!(gui_warning("10.9.0.1:9443".parse().unwrap(), &s).is_none(), "a management address");
         assert!(gui_warning("203.0.113.5:9443".parse().unwrap(), &s).is_some());
+        s.ssh.enabled = true;
+        s.ssh.bind = "0.0.0.0:22".into();
+        assert!(gui_warning("10.9.0.1:9443".parse().unwrap(), &s).is_some(), "SSH is on every address");
     }
 
     #[test]
@@ -316,7 +325,7 @@ mod tests {
             let db = crate::db::memory().await;
             let (settings, _) = SettingsStore::load(db.clone()).await.unwrap();
             let state =
-                AppState::new(db, settings, StatusMap::default(), "127.0.0.1:9443".parse().unwrap(), "test.db".into())
+                AppState::new(db, settings, StatusMap::default(), "127.0.0.1:9443".parse().unwrap(), "test.db".into(), "SHA256:test".into())
                     .unwrap();
             Self { app: router(state.clone()), state, cookie: String::new() }
         }

@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- SSH decoy: an OpenSSH-style server, with a real key exchange and an Ed25519
+  host key of its own, that refuses every password and every public key and
+  disconnects after six tries. Each password is recorded with the username
+  and its length, each key with its type and SHA-256 fingerprint, and the
+  client's version line as a `handshake` event. The version it announces is
+  set in the GUI. The packaged service sets it up on port 22 but leaves it
+  off, since 22 is normally the host's own sshd; the docs say how to move
+  sshd first.
+
+### Changed
+
+- The packaged service starts after sshd, so sshd always gets port 22 first
+  at boot.
+- The Decoys page shows its four cards two to a row.
+
 ## [0.2.0] — 2026-11-18
 
 ### Added

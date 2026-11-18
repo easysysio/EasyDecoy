@@ -14,6 +14,7 @@
 pub mod ftp;
 pub mod http;
 mod lines;
+pub mod ssh;
 pub mod telnet;
 
 use std::future::Future;
@@ -31,7 +32,7 @@ use crate::event::{Event, EventTx};
 
 /// A fake network service.
 pub trait Decoy: Send + Sync + 'static {
-    /// Name used in events and logs ("telnet", "http").
+    /// Name used in events and logs ("telnet", "http", "ftp", "ssh").
     const NAME: &'static str;
 
     /// Talks to one connected client until the session ends.
@@ -51,14 +52,21 @@ pub struct Shared {
 /// One connected client.
 pub struct Conn {
     stream: TcpStream,
+    recorder: Recorder,
+}
+
+/// Records events about one client. Cheap to clone.
+#[derive(Clone)]
+pub struct Recorder {
     decoy: &'static str,
     peer: SocketAddr,
     local: SocketAddr,
     events: EventTx,
-    idle: Duration,
+    /// The idle timeout from the limits.
+    pub idle: Duration,
 }
 
-impl Conn {
+impl Recorder {
     /// Starts an event about this client.
     pub fn event(&self, kind: &'static str) -> Event {
         Event::new(self.decoy, kind, self.peer, self.local)
@@ -67,11 +75,28 @@ impl Conn {
     pub async fn record(&self, event: Event) {
         self.events.send(event).await;
     }
+}
+
+impl Conn {
+    /// Starts an event about this client.
+    pub fn event(&self, kind: &'static str) -> Event {
+        self.recorder.event(kind)
+    }
+
+    pub async fn record(&self, event: Event) {
+        self.recorder.record(event).await;
+    }
+
+    /// The socket itself and the recorder, for a decoy that hands the
+    /// connection to a protocol library (SSH).
+    pub fn into_parts(self) -> (TcpStream, Recorder) {
+        (self.stream, self.recorder)
+    }
 
     /// Reads what the client sent. 0 means the client is gone: it closed the
     /// connection, or went quiet for longer than the idle timeout.
     pub async fn read(&mut self, buf: &mut [u8]) -> Result<usize> {
-        match tokio::time::timeout(self.idle, self.stream.read(buf)).await {
+        match tokio::time::timeout(self.recorder.idle, self.stream.read(buf)).await {
             Ok(read) => Ok(read?),
             Err(_) => Ok(0),
         }
@@ -127,11 +152,7 @@ pub async fn serve<D: Decoy>(decoy: Arc<D>, listener: TcpListener, shared: Share
 
         let conn = Conn {
             stream,
-            decoy: D::NAME,
-            peer,
-            local,
-            events: shared.events.clone(),
-            idle: shared.idle,
+            recorder: Recorder { decoy: D::NAME, peer, local, events: shared.events.clone(), idle: shared.idle },
         };
         let decoy = decoy.clone();
         let session = shared.session;

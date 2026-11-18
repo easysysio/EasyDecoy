@@ -171,10 +171,11 @@ impl EventRow {
         let summary = match kind.as_str() {
             "login_attempt" => {
                 let user = text("username");
-                let length = match text("password_length").as_str() {
-                    "" => String::new(),
-                    "1" => "password of 1 character".to_string(),
-                    n => format!("password of {n} characters"),
+                let length = match (text("password_length").as_str(), text("key_type")) {
+                    ("", key) if !key.is_empty() => format!("{key} key"),
+                    ("", _) => String::new(),
+                    ("1", _) => "password of 1 character".to_string(),
+                    (n, _) => format!("password of {n} characters"),
                 };
                 match (user.is_empty(), length.is_empty()) {
                     (false, false) => format!("{user} · {length}"),
@@ -187,6 +188,7 @@ impl EventRow {
                 user => format!("{} {} · {user}", text("method"), text("path")),
             },
             "non_http" => text("sample"),
+            "handshake" => text("client"),
             "command" => format!("{} {}", text("command"), text("argument")).trim_end().to_string(),
             _ => String::new(),
         };

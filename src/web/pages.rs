@@ -5,7 +5,7 @@
 //                paths, the decoys' status and the latest events
 //   /events      every event, filtered and paged; /events/export streams the
 //                same selection as JSON lines
-//   /decoys      each decoy's status and settings (Telnet, HTTP, FTP)
+//   /decoys      each decoy's status and settings (Telnet, HTTP, FTP, SSH)
 //   /settings    limits, recording (retention, events file) and syslog
 //   /account     the password, and the audit trail
 //
@@ -78,6 +78,13 @@ fn statuses(state: &AppState, s: &Settings) -> Vec<DecoyStatus> {
             icon: "bi-folder2-open",
             bind: s.ftp.bind.clone(),
             status: state.status.get("ftp"),
+        },
+        DecoyStatus {
+            name: "ssh",
+            label: "SSH",
+            icon: "bi-key",
+            bind: s.ssh.bind.clone(),
+            status: state.status.get("ssh"),
         },
     ]
 }
@@ -161,7 +168,7 @@ pub async fn events(
     ctx.insert("prev_url", &prev);
     ctx.insert("next_url", &next);
     ctx.insert("export_url", &events_url("/events/export", &filter, None));
-    ctx.insert("kinds", &["connect", "login_attempt", "request", "non_http", "command"]);
+    ctx.insert("kinds", &["connect", "login_attempt", "request", "non_http", "command", "handshake"]);
     state.render("events.html", ctx)
 }
 
@@ -207,6 +214,7 @@ fn decoys_page(state: &AppState, user: &User, s: &Settings, saved: &str, error: 
     ctx.insert("error_for", &error.as_ref().map(|(f, _)| *f));
     ctx.insert("error", &error.map(|(_, e)| e));
     ctx.insert("gui", &state.gui.to_string());
+    ctx.insert("ssh_fingerprint", &state.ssh_fingerprint);
     state.render("decoys.html", ctx)
 }
 
@@ -233,6 +241,14 @@ pub struct FtpForm {
     enabled: Option<String>,
     bind: String,
     banner: String,
+}
+
+#[derive(Deserialize)]
+pub struct SshForm {
+    csrf: String,
+    enabled: Option<String>,
+    bind: String,
+    version: String,
 }
 
 #[derive(Deserialize)]
@@ -334,6 +350,25 @@ pub async fn save_ftp(
     match save(&state, &user, peer, new.clone(), "save_ftp", &["ftp"]).await? {
         None => Ok(Redirect::to("/decoys?saved=ftp").into_response()),
         Some(problem) => Ok(decoys_page(&state, &user, &new, "", Some(("ftp", problem)))?.into_response()),
+    }
+}
+
+pub async fn save_ssh(
+    State(state): State<AppState>,
+    Extension(user): Extension<User>,
+    ConnectInfo(peer): ConnectInfo<SocketAddr>,
+    Form(form): Form<SshForm>,
+) -> Result<Response, WebError> {
+    if !user.csrf_ok(&form.csrf) {
+        return Ok(forbidden());
+    }
+    let mut new = (*state.settings.current()).clone();
+    new.ssh.enabled = form.enabled.is_some();
+    new.ssh.bind = form.bind.trim().to_string();
+    new.ssh.version = form.version.trim().to_string();
+    match save(&state, &user, peer, new.clone(), "save_ssh", &["ssh"]).await? {
+        None => Ok(Redirect::to("/decoys?saved=ssh").into_response()),
+        Some(problem) => Ok(decoys_page(&state, &user, &new, "", Some(("ssh", problem)))?.into_response()),
     }
 }
 

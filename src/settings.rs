@@ -28,6 +28,7 @@ pub struct Settings {
     pub telnet: TelnetSettings,
     pub http: HttpSettings,
     pub ftp: FtpSettings,
+    pub ssh: SshSettings,
     pub recording: Recording,
     pub syslog: SyslogSettings,
 }
@@ -112,6 +113,31 @@ pub struct FtpSettings {
 impl Default for FtpSettings {
     fn default() -> Self {
         Self { enabled: true, bind: "0.0.0.0:2121".to_string(), banner: "(vsFTPd 3.0.5)".to_string() }
+    }
+}
+
+/// The SSH decoy: a server that never accepts a login.
+///
+/// Off by default: port 22 is usually the host's own sshd, which has to move
+/// to another port before the decoy can have it.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct SshSettings {
+    pub enabled: bool,
+    /// Address and port to listen on, as ip:port.
+    pub bind: String,
+    /// What the server calls itself after "SSH-2.0-", as OpenSSH sends
+    /// "OpenSSH_8.9p1 Ubuntu-3ubuntu0.10".
+    pub version: String,
+}
+
+impl Default for SshSettings {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            bind: "0.0.0.0:2222".to_string(),
+            version: "OpenSSH_8.9p1 Ubuntu-3ubuntu0.10".to_string(),
+        }
     }
 }
 
@@ -231,11 +257,23 @@ impl Settings {
         let telnet = bind_address("Telnet", &self.telnet.bind)?;
         let http = bind_address("HTTP", &self.http.bind)?;
         let ftp = bind_address("FTP", &self.ftp.bind)?;
+        let ssh = bind_address("SSH", &self.ssh.bind)?;
         text("Telnet banner", &self.telnet.banner, 0, 200)?;
         text("Telnet hostname", &self.telnet.hostname, 1, 64)?;
         text("HTTP Server header", &self.http.server_header, 0, 128)?;
         text("HTTP page title", &self.http.title, 1, 128)?;
         text("FTP banner", &self.ftp.banner, 1, 200)?;
+        text("SSH version", &self.ssh.version, 1, 200)?;
+        // RFC 4253 §4.2: printable US-ASCII, and the software name (up to the
+        // first space) has no space or minus sign in it.
+        if !self.ssh.version.chars().all(|c| c.is_ascii_graphic() || c == ' ')
+            || self.ssh.version.starts_with(' ')
+            || self.ssh.version.split(' ').next().is_some_and(|name| name.contains('-'))
+        {
+            return Err("SSH version must be plain ASCII, with no minus sign before the first space, \
+                        e.g. OpenSSH_9.6p1 Ubuntu-3ubuntu13.5"
+                .to_string());
+        }
 
         let mut taken = vec![("the management GUI", gui)];
         if self.telnet.enabled {
@@ -246,6 +284,9 @@ impl Settings {
         }
         if self.ftp.enabled {
             taken.push(("the FTP decoy", ftp));
+        }
+        if self.ssh.enabled {
+            taken.push(("the SSH decoy", ssh));
         }
         for (i, (a, x)) in taken.iter().enumerate() {
             for (b, y) in &taken[i + 1..] {
@@ -434,6 +475,18 @@ mod tests {
         assert!(check(|s| s.http.server_header = "nginx\r\nX-Evil: 1".into()).is_err());
         assert!(check(|s| s.ftp.banner = String::new()).is_err());
         assert!(check(|s| s.ftp.bind = "0.0.0.0:8080".into()).unwrap_err().contains("HTTP decoy already uses"));
+        assert!(check(|s| s.ssh.version = String::new()).is_err());
+        assert!(check(|s| s.ssh.version = "Open-SSH_9.6".into()).is_err());
+        assert!(check(|s| s.ssh.version = "OpenSSH_9.6p1 Ubuntu-3ubuntu13.5".into()).is_ok());
+        assert!(check(|s| s.ssh.version = "OpenSSH_9.6\u{e9}".into()).is_err());
+        assert!(check(|s| {
+            s.ssh.enabled = true;
+            s.ssh.bind = "0.0.0.0:2121".into();
+        })
+        .unwrap_err()
+        .contains("FTP decoy already uses"));
+        // Off, it holds no port.
+        assert!(check(|s| s.ssh.bind = "0.0.0.0:2121".into()).is_ok());
         assert!(check(|s| s.limits.max_connections = 0).is_err());
         assert!(check(|s| {
             s.syslog.enabled = true;

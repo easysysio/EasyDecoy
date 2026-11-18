@@ -95,6 +95,81 @@ commands, and a line longer than 1024 bytes is cut off rather than buffered.
 The packaged service starts it on port **21**. An upgrade from 0.1.0, which
 had no FTP decoy, leaves it off; turn it on from the **Decoys** page.
 
+## SSH
+
+An SSH server that answers like a stock Ubuntu one and lets nobody in:
+
+```text
+$ ssh root@fileserver01
+root@fileserver01's password:
+Permission denied, please try again.
+root@fileserver01's password:
+Permission denied, please try again.
+root@fileserver01's password:
+root@fileserver01: Permission denied (publickey,password).
+```
+
+SSH is encrypted after its first line, so this decoy really does the key
+exchange, with a host key of its own, before it refuses anything.
+
+- It introduces itself as `SSH-2.0-` followed by the **version**,
+  `OpenSSH_8.9p1 Ubuntu-3ubuntu0.10` by default. That line is the first thing
+  any client or scanner reads, so make it match your real servers.
+- It offers what Ubuntu's sshd offers: **public key** and **password**.
+- A wrong password is refused after **2 seconds**, as PAM does on a real host.
+  A key is refused at once. After **six** refusals the client is
+  disconnected, as OpenSSH's `MaxAuthTries` does.
+- Nobody gets past the login, so there is never a shell, a command,
+  a file transfer or a forwarded port.
+
+What it records:
+
+- A `handshake` as soon as the client says what it is, such as
+  `SSH-2.0-OpenSSH_9.6` or `SSH-2.0-Go`, so a scanner that reads the banner
+  and leaves is seen too. Something that isn't SSH is recorded the same way:
+  its first line.
+- A `login_attempt` for each password, with the `username` and the
+  `password_length`, never the password.
+- A `login_attempt` for each public key offered, with the `username`, the
+  key's type and its SHA-256 fingerprint, as `ssh-keygen -lf` shows it. A
+  fingerprint seen on several decoys, or again next month, is the same key.
+
+The host key is an Ed25519 key that EasyDecoy makes on its first start and
+keeps in the database, so a client that comes back sees the same fingerprint.
+The **Decoys** page shows it. It is the decoy's own key, never the host's.
+
+### Port 22
+
+The packaged service sets the SSH decoy up on port **22** but leaves it
+**off**: on almost every server, 22 is the host's own sshd, the one you use to
+manage it. To give 22 to the decoy:
+
+1. Move the real sshd to another port, say 2222. In
+   `/etc/ssh/sshd_config`, set `Port 2222`, then restart it
+   (`sudo systemctl restart ssh`, or `sshd` on RHEL and SUSE). Allow the new
+   port in the host's firewall and in SELinux
+   (`sudo semanage port -a -t ssh_port_t -p tcp 2222`) first if they are on.
+2. **From a second terminal, check that `ssh -p 2222 decoy-host` works**
+   before you close the session you are in.
+3. Turn the SSH decoy on in the GUI. Its card says **Running on 0.0.0.0:22**.
+
+From then on, reach the host with `-p 2222`, and the GUI's tunnel too:
+
+```bash
+ssh -p 2222 -L 9443:127.0.0.1:9443 decoy-host
+```
+
+If sshd still has 22, the decoy can't take it: its card says **Not running**,
+and nothing else changes. The packaged service also starts after sshd, so on
+a reboot sshd gets 22 first, never the decoy.
+
+!!! warning "Your own `ssh` will knock on it"
+    Once the decoy has port 22, `ssh decoy-host` without `-p 2222` reaches the
+    decoy. Your client warns that the host key has changed, and if you go on,
+    your login attempt is recorded like anyone's: the username and the
+    password's length, never the password. Add `Port 2222` for the host to
+    your `~/.ssh/config`.
+
 ## Making them believable
 
 A decoy only works if an intruder believes it.
@@ -103,7 +178,7 @@ A decoy only works if an intruder believes it.
   `fs-ams-02`, a `fileserver01` stands out. On the GUI's **Decoys** page, set
   the hostname, banners, Server header and page title to fit in. A file
   server whose FTP greeting says ProFTPD where your others run vsftpd is a
-  tell.
+  tell, and so is an SSH version from another distribution.
 - **Give it an address nothing uses.** No legitimate client should have any
   reason to reach it, so every event means something.
 - **Keep it out of anything that would be used normally.** Don't put the

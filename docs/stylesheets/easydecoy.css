@@ -41,6 +41,11 @@ body:has(.es-home) .md-footer {
   margin: auto 0 0;
 }
 
+/* An odd card out spans the row. */
+.ed-type-wide {
+  grid-column: 1 / -1;
+}
+
 /* --------------------------------------------------------------------------
    Landing: the feature grid
    -------------------------------------------------------------------------- */

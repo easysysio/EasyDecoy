@@ -25,6 +25,9 @@ EasyDecoy keeps its settings in two places:
 | FTP: Enabled | on | Run the FTP decoy. An upgrade from 0.1.0 leaves it off. |
 | FTP: Listen on | `0.0.0.0:2121` | Address and port. The packaged service starts on `0.0.0.0:21`. |
 | FTP: Banner | `(vsFTPd 3.0.5)` | The greeting after `220`, as a real server names itself. |
+| SSH: Enabled | off | Run the SSH decoy. Off until you turn it on: see [Port 22](decoys.md#port-22). |
+| SSH: Listen on | `0.0.0.0:2222` | Address and port. The packaged service sets `0.0.0.0:22`. |
+| SSH: Version | `OpenSSH_8.9p1 Ubuntu-3ubuntu0.10` | Sent after `SSH-2.0-` when a client connects. Plain ASCII, no `-` before the first space. |
 
 Saving a decoy restarts that decoy alone. Its listener is closed and opened
 again on the new address, and the sessions it had open end.
@@ -137,8 +140,8 @@ sudo chmod 640 /etc/easydecoy/gui.key
 
 ## Ports below 1024
 
-The packaged service is granted `CAP_NET_BIND_SERVICE`, so it binds 23 and 80
-without running as root. Running the binary by hand on those ports needs the
+The packaged service is granted `CAP_NET_BIND_SERVICE`, so it binds 23, 80, 21
+and 22 without running as root. Running the binary by hand on those ports needs the
 same capability:
 
 ```bash

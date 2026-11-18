@@ -13,7 +13,7 @@
   <div class="col-6 col-md-2">
     <select class="form-select form-select-sm" name="decoy" aria-label="Decoy">
       <option value="">Every decoy</option>
-      {% for d in ["telnet", "http", "ftp"] %}
+      {% for d in ["telnet", "http", "ftp", "ssh"] %}
       <option value="{{ d }}" {% if filter.decoy == d %}selected{% endif %}>{{ d }}</option>
       {% endfor %}
     </select>

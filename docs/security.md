@@ -11,6 +11,14 @@ There is no shell behind the Telnet login, no web application behind the
 sign-in page, and no real service anywhere a client could reach. Nothing a
 client sends is executed, interpreted or passed to the host.
 
+The SSH decoy goes one step further than the others, because SSH is
+encrypted: it does a real key exchange, with
+[russh](https://github.com/warp-tech/russh), before it can refuse a login.
+But no login ever succeeds, so it never opens a channel: no shell, no
+command, no file transfer, no port forwarding. Its host key is its own,
+kept in EasyDecoy's database. The host's keys in `/etc/ssh` are never read,
+and the service couldn't read them anyway.
+
 ## Passwords are never stored
 
 A login attempt records the username and the password's **length**. Anyone who
@@ -27,6 +35,7 @@ the next intruder to find.
 | Longest session | Session limit, default 120 s |
 | Telnet or FTP line | 1024 bytes |
 | FTP commands per connection | 50 |
+| SSH login attempts per connection | 6 |
 | HTTP request head / body | 8 KiB / 4 KiB |
 | Recorded text, per field | 16 to 512 characters |
 
@@ -85,9 +94,8 @@ kept out of the way:
   moves through a network.
 - **It does not block anyone.** It records; acting on what it records is up to
   you or your collector.
-- **No encrypted decoys.** There is no HTTPS or SSH decoy yet, and syslog is
-  sent as plain UDP or TCP. Keep the path to your collector on a network you
-  trust.
+- **No HTTPS decoy.** The web decoy is plain HTTP, and syslog is sent as
+  plain UDP or TCP. Keep the path to your collector on a network you trust.
 - **Events on the host are not tamper-proof.** Anyone with root on the decoy
   host can edit the database or the events file. Sending events to a
   collector keeps a copy out of reach.

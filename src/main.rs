@@ -139,11 +139,13 @@ async fn main() -> Result<()> {
     }
 
     let (events, writer) = event::spawn_writer(db.clone(), settings.clone()).await;
-    let (status, decoys) = supervisor::spawn(settings.clone(), events);
+    let host_key = decoy::ssh::host_key(&db).await?;
+    let ssh_fingerprint = decoy::ssh::fingerprint(&host_key);
+    let (status, decoys) = supervisor::spawn(settings.clone(), events, host_key);
     let retention = tokio::spawn(store::serve_retention(db.clone(), settings.clone()));
 
     let pem = web::tls::load(&db, &config, gui).await?;
-    let state = web::AppState::new(db.clone(), settings.clone(), status, gui, db_file)?;
+    let state = web::AppState::new(db.clone(), settings.clone(), status, gui, db_file, ssh_fingerprint)?;
     if let Some(warning) = web::gui_warning(gui, &settings.current()) {
         tracing::warn!("{warning}");
     }
@@ -216,6 +218,8 @@ async fn first_start(
                 defaults.telnet.bind = "0.0.0.0:23".to_string();
                 defaults.http.bind = "0.0.0.0:80".to_string();
                 defaults.ftp.bind = "0.0.0.0:21".to_string();
+                // Off until it is turned on: the host's own sshd has port 22.
+                defaults.ssh.bind = "0.0.0.0:22".to_string();
             }
             tracing::info!(
                 "first start: default settings (Telnet on {}, HTTP on {}, FTP on {})",

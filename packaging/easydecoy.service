@@ -3,7 +3,10 @@
 [Unit]
 Description=EasyDecoy decoy network services
 Documentation=https://github.com/easysysio/EasyDecoy
-After=network-online.target
+# After the host's own sshd (ssh.service on Debian and Ubuntu, sshd.service
+# elsewhere), so at boot sshd always gets port 22 first: an SSH decoy left on
+# port 22 shows "Not running" rather than lock you out.
+After=network-online.target ssh.service sshd.service
 Wants=network-online.target
 
 [Service]
@@ -15,7 +18,7 @@ RestartSec=2
 
 # An account of its own, never root. A decoy is the one service built to be
 # found by an intruder, and all it needs beyond an ordinary user is to bind the
-# real ports (23, 80, 21). The management GUI listens on 127.0.0.1:9443 by
+# real ports (23, 80, 21, 22). The management GUI listens on 127.0.0.1:9443 by
 # default. The package creates the account (packaging/post-install.sh, run
 # after every install and upgrade).
 User=easydecoy

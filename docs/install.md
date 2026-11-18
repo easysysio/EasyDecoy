@@ -56,10 +56,14 @@ The [GUI page](gui.md) walks through the rest.
 
 !!! note "The packaged service uses the real ports"
     On its first start the service puts the Telnet decoy on **23**, the web
-    decoy on **80** and the FTP decoy on **21**. If another service on the host already uses one of
-    them, that decoy shows **Not running** in the GUI, with the reason, and
-    EasyDecoy tries it again every 30 seconds. Move it to another port on the
-    Decoys page, or turn it off.
+    decoy on **80** and the FTP decoy on **21**. If another service on the
+    host already uses one of them, that decoy shows **Not running** in the
+    GUI, with the reason, and EasyDecoy tries it again every 30 seconds. Move
+    it to another port on the Decoys page, or turn it off.
+
+    The SSH decoy is set up on **22** but starts **off**, since 22 is
+    normally the host's own sshd. [Port 22](decoys.md#port-22) says how to
+    move sshd and turn the decoy on.
 
 ## What the package installs
 
@@ -92,7 +96,7 @@ that file, and on the first start of 0.2.0 its decoy, limit, syslog and
 events-file settings become the database's. Nothing changes for the decoys: they
 listen where they did, under the same names, and events still go to
 `/var/log/easydecoy/events.jsonl`. The FTP decoy, new in 0.2.0, starts off;
-turn it on from the **Decoys** page.
+turn it on from the **Decoys** page. So does the SSH decoy.
 
 From then on the settings are changed in the GUI, and the old ones in the file
 are ignored. The log says so at each start until you delete them, leaving
@@ -103,7 +107,7 @@ are ignored. The log says so at each start until you delete them, leaving
 With a Rust toolchain, EasyDecoy runs straight from a checkout. It reads
 `config/easydecoy.toml`, keeps its database in `easydecoy.db` beside it, and
 puts the decoys on unprivileged ports (Telnet on 2323, web on 8080, FTP on
-2121):
+2121, and SSH on 2222 once you turn it on):
 
 ```bash
 git clone https://github.com/easysysio/EasyDecoy
@@ -117,6 +121,7 @@ terminal, knock:
 ```bash
 telnet localhost 2323
 curl -d 'username=admin&password=x' http://localhost:8080/login
+ssh -p 2222 admin@localhost     # after turning SSH on
 ```
 
 The events are on the GUI's dashboard. EasyDecoy's own log goes to stderr.

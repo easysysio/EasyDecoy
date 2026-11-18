@@ -58,6 +58,13 @@ bcrypt = "0.17"
 rand = "0.8"
 sha2 = "0.10"
 
+# The SSH decoy's protocol: key exchange, encryption, the login messages.
+# ring rather than the default aws-lc-rs, as for the GUI's TLS; no `rsa`
+# feature (the rsa crate has RUSTSEC-2023-0071), so the decoy's host key is
+# Ed25519. Clients' RSA keys are still recorded: a key is refused when it is
+# offered, before there is a signature to check.
+russh = { version = "0.65", default-features = false, features = ["ring"] }
+
 # Build-time code (proc macros, build scripts) is not stripped. On macOS 27.2,
 # `strip` leaves sqlx's macro library in a state dyld refuses to load
 # ("mis-aligned LINKEDIT string pool"), which breaks `cargo build --release`.
@@ -85,8 +92,8 @@ priority = "optional"
 depends = "$auto"
 maintainer-scripts = "packaging/deb"
 extended-description = """\
-EasyDecoy runs decoy network services: a Telnet login and a web admin panel
-that look real but lead nowhere. Nobody legitimate has a reason to connect to
+EasyDecoy runs decoy network services: a Telnet login, a web admin panel, an
+FTP server and an SSH server that look real but lead nowhere. Nobody legitimate has a reason to connect to
 them, so every connection is recorded as an event worth a look, and shown in
 a web management GUI."""
 assets = [
