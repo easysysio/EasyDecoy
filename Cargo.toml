@@ -1,6 +1,6 @@
 [package]
 name = "easydecoy"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2024"
 authors = ["Yariv Hakim"]
 description = "EasyDecoy - decoy network services that detect intruders"

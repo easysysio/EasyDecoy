@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.1] — 2026-11-18
+
 ### Added
 
 - SSH decoy: an OpenSSH-style server, with a real key exchange and an Ed25519
@@ -23,6 +25,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The packaged service starts after sshd, so sshd always gets port 22 first
   at boot.
 - The Decoys page shows its four cards two to a row.
+- The install instructions use the signed EasySYS package repository
+  (`repo.easysys.io/easydecoy`), so upgrades come through apt, dnf or zypper.
+  A package from the GitHub release can still be installed by hand.
+
+### Fixed
+
+- An upgrade from 0.1.0 under the packaged service set the new FTP decoy up
+  on 2121, the port for running from source, rather than 21. It now gets 21,
+  still off.
+
+### Upgrading from 0.2.0
+
+On its first start under the packaged service, 0.2.1 sets the SSH decoy up on
+port 22, off; nothing else changes. Move the host's sshd before turning it on.
 
 ## [0.2.0] — 2026-11-18
 
